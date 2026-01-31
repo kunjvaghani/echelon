@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import re
 import sys
 from PIL import Image
 import numpy as np
@@ -134,6 +135,60 @@ def inject_behavior_script():
     except Exception as e:
         print(f"Error injecting JS: {e}")
 
+def inject_ui_enhancements():
+    js = """
+    <script>
+    try {
+        const doc = window.parent.document;
+        // Observe DOM changes to catch the inputs when they render
+        const observer = new MutationObserver(() => {
+            // DOB Masking
+            const dobInputs = doc.querySelectorAll('input[placeholder="DD/MM/YYYY"]');
+            dobInputs.forEach(input => {
+                if (input.dataset.dobMaskAttached) return;
+                input.dataset.dobMaskAttached = "true";
+                input.addEventListener('input', function(e) {
+                    let v = e.target.value.replace(/\\D/g, '').substring(0, 8);
+                    let n = '';
+                    if (v.length > 4) {
+                        n = v.substring(0, 2) + '/' + v.substring(2, 4) + '/' + v.substring(4);
+                    } else if (v.length > 2) {
+                        n = v.substring(0, 2) + '/' + v.substring(2);
+                    } else {
+                        n = v;
+                    }
+                    if (n !== e.target.value) {
+                        e.target.value = n;
+                        e.target.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+            });
+
+            // Phone Number Restriction (Digits only, max 10)
+            // Streamlit adds aria-label matching the label text
+            const phoneInputs = doc.querySelectorAll('input[aria-label="Phone Number"]');
+            phoneInputs.forEach(input => {
+                if (input.dataset.phoneRestricted) return;
+                input.dataset.phoneRestricted = "true";
+                input.addEventListener('input', function(e) {
+                     // Remove non-digits and limit to 10
+                     let v = e.target.value.replace(/\\D/g, '').substring(0, 10);
+                     if (v !== e.target.value) {
+                         e.target.value = v;
+                         e.target.dispatchEvent(new Event('input', { bubbles: true }));
+                     }
+                });
+            });
+
+        });
+        observer.observe(doc.body, { childList: true, subtree: true });
+    } catch (e) {
+        console.error("UI Enhancements Injection Failed", e);
+    }
+    </script>
+    """
+    components.html(js, height=0, width=0)
+
 # --- Page Functions ---
 
 def show_home_page():
@@ -225,6 +280,7 @@ def show_home_page():
 def show_registration_page():
     # Inject Behavior Tracker with Session Link
     inject_behavior_script()
+    inject_ui_enhancements()
     
     st.header("📝 User Registration (Baseline Creation)")
     st.markdown("Create a verified identity baseline. This data will be used to detect fraud in future transactions.")
@@ -234,16 +290,20 @@ def show_registration_page():
         
         with col1:
             st.subheader("1. Personal Details")
-            full_name = st.text_input("Full Name (as on ID)")
-            email = st.text_input("Email Address (Unique ID)")
-            dob = st.date_input("Date of Birth") # Default format YYYY-MM-DD
-            phone = st.text_input("Phone Number")
+            full_name = st.text_input("Full Name (as per Aadhaar Card)")
+            email = st.text_input("Email Address")
+            dob = st.text_input("Date of Birth (DD/MM/YYYY)", placeholder="DD/MM/YYYY")
+            phone = st.text_input("Phone Number", max_chars=10)
         
         with col2:
             st.subheader("2. Identity Document")
-            doc_type = st.selectbox("Select Document Type", ["Aadhaar Card", "PAN Card", "Driving License", "Passport"])
+            doc_type = st.selectbox("Select Document Type", ["Aadhaar Card"])
             doc_id_number = st.text_input(f"{doc_type} Number")
-            uploaded_file = st.file_uploader(f"Upload {doc_type} Image", type=['jpg', 'jpeg', 'png'])
+            uploaded_file = st.file_uploader(f"Upload {doc_type} Image (Max 2MB)", type=['jpg', 'jpeg', 'png'])
+            
+            if uploaded_file is not None and uploaded_file.size > 2 * 1024 * 1024:
+                st.error("❌ File size exceeds 2MB limit. Please upload a smaller file.")
+                uploaded_file = None
             
         st.subheader("3. Biometric Baseline")
         st.info("Look straight into the camera and ensure good lighting.")
@@ -272,6 +332,12 @@ def show_registration_page():
             
             if not full_name or not email or not uploaded_file or not selfie_image or not doc_id_number:
                 st.error("❌ Please fill all fields including Document ID and capture both document and selfie.")
+            elif not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email):
+                st.error("❌ Please enter a valid email address.")
+            elif not re.match(r"^\d{2}/\d{2}/\d{4}$", dob):
+                st.error("❌ Please enter Date of Birth in DD/MM/YYYY format.")
+            elif not re.match(r"^\d{10}$", phone):
+                st.error("❌ Phone Number must be exactly 10 digits.")
             else:
                 try:
                     # 1. Initialize DB (Creates folders & tables if missing)
@@ -325,7 +391,14 @@ def show_registration_page():
                     dummy_behavior = "{'avg_flight': 0.2}"
 
                     # 4. Save to MongoDB
-                    password = str(dob).replace("-", "") # Format: YYYYMMDD
+                    # password = str(dob).replace("-", "") # Format: YYYYMMDD
+                    # process dob from DD/MM/YYYY to YYYYMMDD
+                    try:
+                        d, m, y = dob.split('/')
+                        password = f"{y}{m}{d}"
+                    except:
+                        # Fallback if regex somehow passed but split fails (unlikely)
+                        password = dob.replace("/", "")
                     
                     user_data = {
                         "email": email,
