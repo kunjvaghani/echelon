@@ -66,6 +66,47 @@ def main():
 
 # --- Page Functions ---
 
+
+
+# --- Behavioral Analysis Integration ---
+import streamlit.components.v1 as components
+from src.behavior_analysis.behavior_utils import BehaviorServer
+import uuid
+
+# Initialize Background Server (Singleton)
+@st.cache_resource
+def init_behavior_server():
+    return BehaviorServer()
+
+behavior_server = init_behavior_server()
+
+def inject_behavior_script():
+    """
+    Injects the passive JavaScript tracker with a synchronized Session ID.
+    """
+    if 'behavior_session_id' not in st.session_state:
+        st.session_state['behavior_session_id'] = str(uuid.uuid4())
+
+    session_id = st.session_state['behavior_session_id']
+    
+    try:
+        js_path = os.path.join(os.path.dirname(__file__), 'behavior_analysis', 'behavior_tracker.js')
+        with open(js_path, 'r') as f:
+            js_code = f.read()
+            
+        # Inject Python Session ID into JS scope
+        html_code = f"""
+        <script>
+            window.PYTHON_SESSION_ID = "{session_id}";
+            {js_code}
+        </script>
+        """
+        components.html(html_code, height=0, width=0) # Invisible
+    except Exception as e:
+        print(f"Error injecting JS: {e}")
+
+# --- Page Functions ---
+
 def show_home_page():
     # st.title("🛡️ Synthetic Identity Fraud Detection System")
     st.markdown("### 🚀 Next-Gen AI Powered e-KYC Verification")
@@ -144,6 +185,9 @@ def show_home_page():
 
 
 def show_registration_page():
+    # Inject Behavior Tracker with Session Link
+    inject_behavior_script()
+    
     st.header("📝 User Registration (Baseline Creation)")
     st.markdown("Create a verified identity baseline. This data will be used to detect fraud in future transactions.")
 
@@ -175,6 +219,19 @@ def show_registration_page():
         import os
         
         if submitted:
+            # --- Behavioral Fraud Check ---
+            session_id = st.session_state.get('behavior_session_id')
+            risk_score, decision, reasons = behavior_server.get_score(session_id)
+            
+            # Use columns to show risk signal without breaking flow (or blocking if critical)
+            if decision == "REJECT":
+                st.error(f"⛔ Registration Blocked: Suspicious Behavior Detected ({risk_score:.2f}). Reasons: {', '.join(reasons)}")
+                return # Stop execution
+            
+            elif decision == "MANUAL_REVIEW":
+                st.warning(f"⚠️ Unusual Behavior Detected ({risk_score:.2f}). Flagged for manual review.")
+                # We typically proceed but mark the user flag. For this demo, we allow it.
+            
             if not full_name or not email or not uploaded_file or not selfie_image or not doc_id_number:
                 st.error("❌ Please fill all fields including Document ID and capture both document and selfie.")
             else:
@@ -196,9 +253,17 @@ def show_registration_page():
                     with open(selfie_path, "wb") as f:
                         f.write(selfie_image.getbuffer())
 
-                    # 3. Simulate Embeddings/Behavior (Placeholder until modules linked)
-                    dummy_embedding = b'\x00' * 128 
-                    dummy_behavior = "{'avg_flight': 0.2}"
+                    # 3. Simulate Embeddings/Behavior
+                    dummy_embedding = b'\\x00' * 128 
+                    
+                    # Store the Real Behavioral Baseline
+                    import json
+                    behavior_baseline = json.dumps({
+                        "risk_score": risk_score,
+                        "decision": decision,
+                        "reasons": reasons,
+                        "session_id": session_id
+                    })
 
                     # 4. Save to MongoDB
                     password = str(dob).replace("-", "") # Format: YYYYMMDD
@@ -212,25 +277,26 @@ def show_registration_page():
                         "document_id": doc_id_number,
                         "password": password,
                         "face_embedding": dummy_embedding, 
-                        "behavior_baseline": dummy_behavior,
+                        "behavior_baseline": behavior_baseline,
                         "role": "user"
                     }
 
                     if db.create_user(user_data):
                         st.success(f"✅ Registration Successful! Your Password is your DOB: {password}")
+                        st.caption(f"Behavior Risk: {decision} ({risk_score:.2f})")
                         st.info("Redirecting to Login...")
                     else:
                         st.warning("⚠️ User with this email already registered!")
                             
                     db.close()
-                        
-                        # Auto-redirect simulation (User manually clicks Login, but we can set session)
-                        # st.session_state['page'] = 'Login' # Requires rerun
                 
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
 
 def show_login_page():
+    # Inject Behavior Tracker
+    inject_behavior_script()
+
     st.header("🔐 User Login")
     
     with st.form("login_form"):
@@ -239,6 +305,14 @@ def show_login_page():
         submitted = st.form_submit_button("Login")
         
         if submitted:
+            # --- Behavioral Fraud Check ---
+            session_id = st.session_state.get('behavior_session_id')
+            risk_score, decision, reasons = behavior_server.get_score(session_id)
+            
+            if decision == "REJECT":
+                st.error(f"⛔ Login Blocked: Suspicious Bot-like Behavior. Reasons: {', '.join(reasons)}")
+                return
+                
             from src.database.db_connection import Database
             db = Database()
             user = db.verify_user(email, password)
@@ -250,11 +324,15 @@ def show_login_page():
                 st.session_state['user_name'] = user.get('full_name', 'User')
                 st.session_state['user_role'] = user.get('role', 'user')
                 st.success(f"Welcome back, {user.get('full_name')}!")
+                if decision == "MANUAL_REVIEW":
+                    st.warning("⚠️ Security Note: Unusual interaction pattern detected.")
                 st.rerun()
             else:
                 st.error("Invalid Credentials")
 
 def show_verification_page():
+
+
     st.header("e-KYC Verification")
     st.info("Verification module coming soon...")
 

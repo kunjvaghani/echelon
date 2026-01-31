@@ -19,3 +19,4 @@ extra-streamlit-components
 pymongo
 python-dotenv
 dnspython
+pyopenssl>=23.2.0
