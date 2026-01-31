@@ -9,4 +9,7 @@ torch; sys_platform == "win32"
 tensorflow; sys_platform == "win32"
 pytesseract
 Pillow
-fpdf
+extra-streamlit-components 
+pymongo
+python-dotenv
+dnspython
