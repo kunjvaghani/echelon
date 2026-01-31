@@ -35,6 +35,5 @@ secrets.toml
 
 # Custom Data & Models
 data/
-models/
 *.db
 *.sqlite3
