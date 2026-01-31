@@ -160,6 +160,7 @@ def show_registration_page():
         with col2:
             st.subheader("2. Identity Document")
             doc_type = st.selectbox("Select Document Type", ["Aadhaar Card", "PAN Card", "Driving License", "Passport"])
+            doc_id_number = st.text_input(f"{doc_type} Number")
             uploaded_file = st.file_uploader(f"Upload {doc_type} Image", type=['jpg', 'jpeg', 'png'])
             
         st.subheader("3. Biometric Baseline")
@@ -174,8 +175,8 @@ def show_registration_page():
         import os
         
         if submitted:
-            if not full_name or not email or not uploaded_file or not selfie_image:
-                st.error("❌ Please fill all fields and capture both document and selfie.")
+            if not full_name or not email or not uploaded_file or not selfie_image or not doc_id_number:
+                st.error("❌ Please fill all fields including Document ID and capture both document and selfie.")
             else:
                 try:
                     # 1. Initialize DB (Creates folders & tables if missing)
@@ -199,23 +200,29 @@ def show_registration_page():
                     dummy_embedding = b'\x00' * 128 
                     dummy_behavior = "{'avg_flight': 0.2}"
 
-                    # 4. Save to SQLite with DOB as Password
+                    # 4. Save to MongoDB
                     password = str(dob).replace("-", "") # Format: YYYYMMDD
                     
-                    # Check if user exists
-                    if db.get_user(email):
-                        st.warning("⚠️ User with this email already registered!")
-                    else:
-                        cursor = db.conn.cursor()
-                        cursor.execute('''
-                            INSERT INTO users (username, full_name, dob, phone, password, face_embedding, behavior_baseline)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ''', (email, full_name, str(dob), phone, password, dummy_embedding, dummy_behavior))
-                        db.conn.commit()
-                        
+                    user_data = {
+                        "email": email,
+                        "full_name": full_name,
+                        "dob": str(dob),
+                        "phone": phone,
+                        "document_type": doc_type,
+                        "document_id": doc_id_number,
+                        "password": password,
+                        "face_embedding": dummy_embedding, 
+                        "behavior_baseline": dummy_behavior,
+                        "role": "user"
+                    }
+
+                    if db.create_user(user_data):
                         st.success(f"✅ Registration Successful! Your Password is your DOB: {password}")
                         st.info("Redirecting to Login...")
-                        db.close()
+                    else:
+                        st.warning("⚠️ User with this email already registered!")
+                            
+                    db.close()
                         
                         # Auto-redirect simulation (User manually clicks Login, but we can set session)
                         # st.session_state['page'] = 'Login' # Requires rerun
@@ -238,12 +245,11 @@ def show_login_page():
             db.close()
             
             if user:
-                # User found: (id, username, full_name, dob, phone, password, face, behavior, role, ...)
-                # Index 8 is role (after adding phone)
+                # User found: user is now a dict
                 st.session_state['logged_in'] = True
-                st.session_state['user_name'] = user[2] # full_name
-                st.session_state['user_role'] = user[8] # role
-                st.success(f"Welcome back, {user[2]}!")
+                st.session_state['user_name'] = user.get('full_name', 'User')
+                st.session_state['user_role'] = user.get('role', 'user')
+                st.success(f"Welcome back, {user.get('full_name')}!")
                 st.rerun()
             else:
                 st.error("Invalid Credentials")
@@ -268,9 +274,19 @@ def show_admin_page():
         st.subheader("User Database")
         try:
             # Fetch all users
-            query = "SELECT id, username, full_name, dob, phone, password, role, created_at FROM users"
-            df_users = pd.read_sql_query(query, db.conn)
-            st.dataframe(df_users, use_container_width=True)
+            users_list = db.get_all_users()
+            df_users = pd.DataFrame(users_list)
+            
+            if not df_users.empty:
+                # Select specific columns to display (including new Doc fields)
+                display_cols = ['full_name', 'email', 'phone', 'dob', 'document_type', 'document_id', 'role', 'created_at']
+                # Ensure validation in case old users don't have these fields
+                for col in display_cols:
+                    if col not in df_users.columns:
+                        df_users[col] = None
+                        
+                df_users = df_users[display_cols]
+                st.dataframe(df_users, use_container_width=True)
             
             st.metric("Total Users", len(df_users))
         except Exception as e:
@@ -279,15 +295,11 @@ def show_admin_page():
     with tab2:
         st.subheader("Recent Verification Attempts")
         try:
-             # Fetch logs (joining with user table for names)
-             query = '''
-                SELECT k.id, u.full_name, k.final_decision, k.doc_score, k.face_score, k.timestamp 
-                FROM kyc_attempts k
-                JOIN users u ON k.user_id = u.id
-                ORDER BY k.timestamp DESC
-             '''
-             df_logs = pd.read_sql_query(query, db.conn)
+             logs_list = db.get_all_logs()
+             df_logs = pd.DataFrame(logs_list)
              st.dataframe(df_logs, use_container_width=True)
+        except Exception as e:
+            st.info("No verification logs found yet.")
         except Exception as e:
             st.info("No verification logs found yet.")
             
