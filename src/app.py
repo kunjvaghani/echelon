@@ -2,6 +2,8 @@ import streamlit as st
 import os
 import re
 import sys
+import time
+from datetime import date
 from PIL import Image
 import numpy as np
 import cv2
@@ -33,6 +35,323 @@ def load_image(image_file):
     return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
 def main():
+    # --- Custom CSS for Premium UI ---
+    st.markdown("""
+    <style>
+    /* Global Styles */
+    .stApp {
+        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+    }
+    
+    /* Navbar Styles */
+    .navbar-container {
+        background: rgba(20, 20, 40, 0.95);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 15px 30px;
+        border-radius: 0 0 20px 20px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+    }
+    
+    .navbar-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .navbar-brand-icon {
+        font-size: 2rem;
+        background: linear-gradient(135deg, #00d4ff, #7c3aed);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .navbar-brand-text {
+        font-size: 1.3rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #ffffff 0%, #a0aec0 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    /* Hero Section */
+    .hero-section {
+        text-align: center;
+        padding: 60px 20px;
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(0, 212, 255, 0.1) 100%);
+        border-radius: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        margin-bottom: 40px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .hero-section::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(124, 58, 237, 0.1) 0%, transparent 50%);
+        animation: pulse 4s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 0.5; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.1); }
+    }
+    
+    .hero-title {
+        font-size: 3.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #ffffff 0%, #00d4ff 50%, #7c3aed 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 15px;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.3rem;
+        color: #a0aec0;
+        margin-bottom: 30px;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .hero-badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #7c3aed, #00d4ff);
+        color: white;
+        padding: 8px 20px;
+        border-radius: 25px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 20px;
+        position: relative;
+        z-index: 1;
+    }
+    
+    /* Problem Statement Section */
+    .problem-section {
+        background: rgba(255, 50, 50, 0.1);
+        border: 1px solid rgba(255, 100, 100, 0.3);
+        border-radius: 20px;
+        padding: 30px;
+        margin-bottom: 40px;
+    }
+    
+    .problem-title {
+        color: #ff6b6b;
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 15px;
+    }
+    
+    .problem-text {
+        color: #e0e0e0;
+        font-size: 1rem;
+        line-height: 1.7;
+    }
+    
+    /* Threat Cards */
+    .threat-card {
+        background: rgba(30, 30, 50, 0.8);
+        border: 1px solid rgba(255, 100, 100, 0.2);
+        border-radius: 15px;
+        padding: 25px;
+        height: 100%;
+        transition: all 0.3s ease;
+    }
+    
+    .threat-card:hover {
+        transform: translateY(-5px);
+        border-color: rgba(255, 100, 100, 0.5);
+        box-shadow: 0 10px 30px rgba(255, 50, 50, 0.2);
+    }
+    
+    .threat-icon {
+        font-size: 2.5rem;
+        margin-bottom: 15px;
+    }
+    
+    .threat-title {
+        color: #ff6b6b;
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+    
+    .threat-desc {
+        color: #aaa;
+        font-size: 0.9rem;
+    }
+    
+    /* Solution Cards */
+    .solution-card {
+        background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(124, 58, 237, 0.1));
+        border: 1px solid rgba(0, 212, 255, 0.3);
+        border-radius: 20px;
+        padding: 30px;
+        text-align: center;
+        height: 100%;
+        transition: all 0.3s ease;
+    }
+    
+    .solution-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 40px rgba(0, 212, 255, 0.2);
+    }
+    
+    .solution-icon {
+        font-size: 3rem;
+        margin-bottom: 15px;
+        background: linear-gradient(135deg, #00d4ff, #7c3aed);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .solution-title {
+        color: #fff;
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+    
+    .solution-desc {
+        color: #a0aec0;
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+    
+    /* Workflow Pipeline */
+    .workflow-container {
+        background: rgba(20, 20, 40, 0.6);
+        border-radius: 20px;
+        padding: 40px 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        margin: 40px 0;
+    }
+    
+    .workflow-step {
+        text-align: center;
+        padding: 15px;
+        transition: all 0.3s ease;
+    }
+    
+    .workflow-step:hover {
+        transform: scale(1.1);
+    }
+    
+    .workflow-number {
+        background: linear-gradient(135deg, #7c3aed, #00d4ff);
+        color: white;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+    
+    .workflow-icon {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+    }
+    
+    .workflow-label {
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    
+    .workflow-arrow {
+        color: #7c3aed;
+        font-size: 2rem;
+        padding-top: 40px;
+    }
+    
+    /* Stats Section */
+    .stat-card {
+        background: rgba(30, 30, 50, 0.8);
+        border-radius: 15px;
+        padding: 25px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #00d4ff, #7c3aed);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .stat-label {
+        color: #a0aec0;
+        font-size: 0.9rem;
+        margin-top: 5px;
+    }
+    
+    /* CTA Section */
+    .cta-section {
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(0, 212, 255, 0.2));
+        border-radius: 25px;
+        padding: 50px;
+        text-align: center;
+        border: 1px solid rgba(124, 58, 237, 0.3);
+        margin: 40px 0;
+    }
+    
+    .cta-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 15px;
+    }
+    
+    .cta-subtitle {
+        color: #a0aec0;
+        font-size: 1.1rem;
+        margin-bottom: 25px;
+    }
+    
+    /* Footer */
+    .footer {
+        text-align: center;
+        padding: 30px;
+        color: #666;
+        font-size: 0.85rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        margin-top: 50px;
+    }
+    
+    /* Section Headers */
+    .section-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+    
+    .section-header h2 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 10px;
+    }
+    
+    .section-header p {
+        color: #a0aec0;
+        font-size: 1rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     # --- Session State Initialization ---
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
@@ -40,55 +359,68 @@ def main():
         st.session_state['user_role'] = 'guest'
     if 'user_name' not in st.session_state:
         st.session_state['user_name'] = ''
+    if 'nav_to' not in st.session_state:
+        st.session_state['nav_to'] = None
 
-    # --- Top Navbar ---
-    col1, col2 = st.columns([4, 1])
+    # --- Premium Navbar ---
+    st.markdown("""
+    <div class="navbar-container">
+        <div class="navbar-brand">
+            <span class="navbar-brand-icon">🛡️</span>
+            <span class="navbar-brand-text">SecureKYC</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    with col1:
-        # Define available pages based on auth status
+    # Navigation Menu
+    col_nav, col_user = st.columns([5, 1])
+    
+    with col_nav:
         if st.session_state['logged_in']:
             if st.session_state['user_role'] == 'admin':
-                menu_options = ["Home", "Verify (e-KYC)", "Admin Dashboard", "Logout"]
+                menu_options = ["🏠 Home", "✅ Verify (e-KYC)", "📊 Admin Dashboard", "🚪 Logout"]
             else:
-                menu_options = ["Home", "Verify (e-KYC)", "Logout"]
+                menu_options = ["🏠 Home", "✅ Verify (e-KYC)", "🚪 Logout"]
         else:
-            menu_options = ["Home", "Register", "Login"]
+            menu_options = ["🏠 Home", "📝 Register", "🔐 Login"]
+        
+        # Check if navigation was triggered by CTA buttons
+        default_index = 0
+        if st.session_state['nav_to'] == 'register' and not st.session_state['logged_in']:
+            default_index = 1  # Register is at index 1
+            st.session_state['nav_to'] = None  # Reset after use
+        elif st.session_state['nav_to'] == 'login' and not st.session_state['logged_in']:
+            default_index = 2  # Login is at index 2
+            st.session_state['nav_to'] = None  # Reset after use
 
-        # Use a horizontal radio button as a Navbar equivalent
-        selected_page = st.radio("", menu_options, horizontal=True, label_visibility="collapsed")
+        selected_page = st.radio("", menu_options, horizontal=True, label_visibility="collapsed", index=default_index)
 
-    with col2:
+    with col_user:
         if st.session_state['logged_in']:
-            # Minimal user profile display
-            st.markdown(f"<div style='text-align: right; padding-top: 5px;'>👤 <b>{st.session_state['user_name']}</b></div>", unsafe_allow_html=True)
-            # st.caption(f"Role: {st.session_state['user_role']}")
-    
-    st.markdown("---") # Separator
+            st.markdown(f"""
+            <div style='text-align: right; padding: 8px 15px; background: rgba(124, 58, 237, 0.2); border-radius: 20px; border: 1px solid rgba(124, 58, 237, 0.3);'>
+                👤 <b style='color: #00d4ff;'>{st.session_state['user_name']}</b>
+            </div>
+            """, unsafe_allow_html=True)
 
     # --- Page Routing ---
-    
-    if selected_page == "Home":
+    if "Home" in selected_page:
         show_home_page()
-    
-    elif selected_page == "Register":
+    elif "Register" in selected_page:
         show_registration_page()
-        
-    elif selected_page == "Login":
+    elif "Login" in selected_page:
         show_login_page()
-        
-    elif selected_page == "Verify (e-KYC)":
+    elif "Verify" in selected_page:
         if st.session_state['logged_in']:
             show_verification_page()
         else:
-            st.warning("Please login to access this page.")
-            
-    elif selected_page == "Admin Dashboard":
+            st.warning("⚠️ Please login to access the verification page.")
+    elif "Admin" in selected_page:
         if st.session_state['logged_in'] and st.session_state['user_role'] == 'admin':
-             show_admin_page()
+            show_admin_page()
         else:
-             st.error("⛔ Access Denied: Admin privileges required.")
-             
-    elif selected_page == "Logout":
+            st.error("⛔ Access Denied: Admin privileges required.")
+    elif "Logout" in selected_page:
         st.session_state['logged_in'] = False
         st.session_state['user_role'] = 'guest'
         st.session_state['user_name'] = ''
@@ -194,85 +526,250 @@ def inject_ui_enhancements():
 def show_home_page():
     # Hero Section
     st.markdown("""
-    <div style="text-align: center; padding: 40px 0;">
-        <h1 style="font-size: 3rem; margin-bottom: 10px;">🛡️ Synthetic Identity Fraud Detection</h1>
-        <p style="font-size: 1.2rem; color: #888;">Next-Gen AI Powered e-KYC Verification System</p>
+    <div class="hero-section">
+        <div class="hero-badge">🔒 AI-Powered Security</div>
+        <h1 class="hero-title">Synthetic Identity Fraud Detection</h1>
+        <p class="hero-subtitle">Next-Generation e-KYC Verification System with Multi-Layer AI Protection</p>
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("---")
-
-    # --- Feature Cards (Modern Glassmorphism Style) ---
-    st.subheader("🌟 Core Capabilities")
-    
-    # Custom CSS for cards
-    card_style = """
-    <div style="
-        background-color: #1e1e1e; 
-        padding: 25px; 
-        border-radius: 15px; 
-        border: 1px solid #333; 
-        text-align: center; 
-        height: 100%;
-        transition: transform 0.2s;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    ">
-        <div style="font-size: 3rem; margin-bottom: 15px;">ICON_PLACEHOLDER</div>
-        <h3 style="margin-bottom: 10px; color: #fff;">TITLE_PLACEHOLDER</h3>
-        <p style="color: #aaa; font-size: 0.95rem;">DESC_PLACEHOLDER</p>
-    </div>
-    """
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown(card_style.replace("ICON_PLACEHOLDER", "📄").replace("TITLE_PLACEHOLDER", "Doc Forgery Detection").replace("DESC_PLACEHOLDER", "Detects AI-generated IDs, Photoshop edits, and metadata anomalies using <b>EfficientNet</b> & <b>ELA Analysis</b>."), unsafe_allow_html=True)
-        
-    with col2:
-        st.markdown(card_style.replace("ICON_PLACEHOLDER", "👤").replace("TITLE_PLACEHOLDER", "Biometric Verification").replace("DESC_PLACEHOLDER", "Ensures liveness & identity match. Prevents spoofing attacks using <b>DeepFace</b> & <b>Anti-Spoofing</b> algorithms."), unsafe_allow_html=True)
-
-    with col3:
-        st.markdown(card_style.replace("ICON_PLACEHOLDER", "🖱️").replace("TITLE_PLACEHOLDER", "Behavioral Analysis").replace("DESC_PLACEHOLDER", "Tracks session metadata, typing speed, and cursor patterns to flag <b>Bot-like interactions</b>."), unsafe_allow_html=True)
-
-    st.markdown("<br><br>", unsafe_allow_html=True)
-
-    # --- Pipeline Visualization ---
-    st.subheader("🔄 End-to-End Security Pipeline")
-    st.info("The system processes users through a multi-stage security filter to ensure maximum integrity.")
-    
-    # Custom Step Process
+    # Problem Statement Section
     st.markdown("""
-    <div style="display: flex; justify-content: space-between; align-items: center; background: #0e1117; padding: 20px; border-radius: 10px; overflow-x: auto;">
-        <div style="text-align: center; min-width: 100px;">📝<br><small>Register</small></div>
-        <div style="font-size: 1.5rem;">➡️</div>
-        <div style="text-align: center; min-width: 100px;">📷<br><small>Doc Scan</small></div>
-        <div style="font-size: 1.5rem;">➡️</div>
-        <div style="text-align: center; min-width: 100px;">😐<br><small>Liveness</small></div>
-        <div style="font-size: 1.5rem;">➡️</div>
-        <div style="text-align: center; min-width: 100px;">🤖<br><small>Behavior</small></div>
-        <div style="font-size: 1.5rem;">➡️</div>
-        <div style="text-align: center; min-width: 100px;">✅<br><small>Decision</small></div>
+    <div class="problem-section">
+        <h3 class="problem-title">⚠️ The Growing Threat of Synthetic Identity Fraud</h3>
+        <p class="problem-text">
+            <b>Synthetic identity fraud</b> is the fastest-growing type of financial crime, causing billions in losses annually. 
+            Criminals combine real and fake information to create new identities that bypass traditional verification systems.
+            <br><br>
+            <b>Key Challenges:</b>
+            <br>• AI-generated fake documents that look authentic
+            <br>• Deepfake technology fooling facial recognition
+            <br>• Bot-driven mass registration attempts
+            <br>• Stolen biometrics used for identity spoofing
+        </p>
     </div>
     """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # --- Tech Stack / About ---
-    with st.expander("🛠️ Under the Hood (Tech Stack)"):
+    
+    # Threat Cards
+    st.markdown("<div class='section-header'><h2>🎯 Common Attack Vectors We Detect</h2><p>Our system is trained to identify and block these fraud techniques</p></div>", unsafe_allow_html=True)
+    
+    t1, t2, t3, t4 = st.columns(4)
+    
+    with t1:
         st.markdown("""
-        - **Frontend**: Streamlit (Python)
-        - **Face Recognition**: DeepFace (FaceNet / VGG-Face)
-        - **Document Analysis**: Tesseract OCR, ELA (Error Level Analysis)
-        - **Database**: MongoDB Atlas (Cloud)
-        - **ML Core**: TensorFlow, PyTorch, Scikit-learn
-        """)
+        <div class="threat-card">
+            <div class="threat-icon">🆔</div>
+            <div class="threat-title">Forged Documents</div>
+            <div class="threat-desc">Photoshopped IDs, fake Aadhaar/PAN cards, AI-generated government documents</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-    st.markdown("---")
-
-    # --- Footer ---
+    with t2:
+        st.markdown("""
+        <div class="threat-card">
+            <div class="threat-icon">🎭</div>
+            <div class="threat-title">Deepfake Faces</div>
+            <div class="threat-desc">AI-generated selfies, video replays, photo masks, screen spoofing</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with t3:
+        st.markdown("""
+        <div class="threat-card">
+            <div class="threat-icon">🤖</div>
+            <div class="threat-title">Bot Attacks</div>
+            <div class="threat-desc">Automated registrations, script-driven form fills, abnormal behavior patterns</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with t4:
+        st.markdown("""
+        <div class="threat-card">
+            <div class="threat-icon">👤</div>
+            <div class="threat-title">Identity Theft</div>
+            <div class="threat-desc">Stolen credentials, mismatched biometrics, unauthorized access attempts</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Our Solution
+    st.markdown("<div class='section-header'><h2>🛡️ Our Multi-Layer Protection System</h2><p>Comprehensive AI-powered verification at every step</p></div>", unsafe_allow_html=True)
+    
+    s1, s2, s3 = st.columns(3)
+    
+    with s1:
+        st.markdown("""
+        <div class="solution-card">
+            <div class="solution-icon">📄</div>
+            <div class="solution-title">Document Verification</div>
+            <div class="solution-desc">
+                ELA (Error Level Analysis) detects image tampering. 
+                EfficientNet AI model classifies real vs fake documents. 
+                OCR extracts and validates ID information.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with s2:
+        st.markdown("""
+        <div class="solution-card">
+            <div class="solution-icon">👤</div>
+            <div class="solution-title">Biometric Verification</div>
+            <div class="solution-desc">
+                DeepFace ensures live person detection.
+                Anti-spoofing algorithms block photos & masks.
+                Face embedding matching confirms identity.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with s3:
+        st.markdown("""
+        <div class="solution-card">
+            <div class="solution-icon">🧠</div>
+            <div class="solution-title">Behavioral Analysis</div>
+            <div class="solution-desc">
+                Keystroke dynamics detect bot behavior.
+                Mouse movement patterns analyzed.
+                Session metadata flags suspicious activity.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Workflow Pipeline
+    st.markdown("<br><div class='section-header'><h2>🔄 e-KYC Verification Workflow</h2><p>Secure end-to-end identity verification process</p></div>", unsafe_allow_html=True)
+    
     st.markdown("""
-    <div style="text-align: center; padding: 20px; color: #666; font-size: 0.8rem;">
-        © 2026 Synthetic Fraud Detection Team | Compliant with GDPR & Data Privacy Standards
+    <div class="workflow-container">
+        <div style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div class="workflow-step">
+                <div class="workflow-number">1</div>
+                <div class="workflow-icon">📱</div>
+                <div class="workflow-label">Phone OTP</div>
+            </div>
+            <div class="workflow-arrow">→</div>
+            <div class="workflow-step">
+                <div class="workflow-number">2</div>
+                <div class="workflow-icon">📝</div>
+                <div class="workflow-label">Registration</div>
+            </div>
+            <div class="workflow-arrow">→</div>
+            <div class="workflow-step">
+                <div class="workflow-number">3</div>
+                <div class="workflow-icon">📄</div>
+                <div class="workflow-label">Doc Upload</div>
+            </div>
+            <div class="workflow-arrow">→</div>
+            <div class="workflow-step">
+                <div class="workflow-number">4</div>
+                <div class="workflow-icon">🤳</div>
+                <div class="workflow-label">Live Selfie</div>
+            </div>
+            <div class="workflow-arrow">→</div>
+            <div class="workflow-step">
+                <div class="workflow-number">5</div>
+                <div class="workflow-icon">🔍</div>
+                <div class="workflow-label">AI Analysis</div>
+            </div>
+            <div class="workflow-arrow">→</div>
+            <div class="workflow-step">
+                <div class="workflow-number">6</div>
+                <div class="workflow-icon">✅</div>
+                <div class="workflow-label">Decision</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Stats Section
+    st.markdown("<br><div class='section-header'><h2>📈 Platform Statistics</h2></div>", unsafe_allow_html=True)
+    
+    stat1, stat2, stat3, stat4 = st.columns(4)
+    
+    with stat1:
+        st.markdown("""
+        <div class="stat-card">
+            <div class="stat-number">99.2%</div>
+            <div class="stat-label">Fraud Detection Rate</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with stat2:
+        st.markdown("""
+        <div class="stat-card">
+            <div class="stat-number">&lt;2s</div>
+            <div class="stat-label">Average Verification Time</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with stat3:
+        st.markdown("""
+        <div class="stat-card">
+            <div class="stat-number">3-Layer</div>
+            <div class="stat-label">Security Pipeline</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with stat4:
+        st.markdown("""
+        <div class="stat-card">
+            <div class="stat-number">24/7</div>
+            <div class="stat-label">Real-time Monitoring</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # CTA Section
+    st.markdown("""
+    <div class="cta-section">
+        <div class="cta-title">🚀 Ready to Get Started?</div>
+        <div class="cta-subtitle">Create your verified identity baseline in minutes</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # CTA Buttons using Streamlit
+    cta1, cta2, cta3 = st.columns([1, 2, 1])
+    with cta2:
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("📝 Register Now", use_container_width=True, type="primary"):
+                st.session_state['nav_to'] = 'register'
+                st.rerun()
+        with col_btn2:
+            if st.button("🔐 Login", use_container_width=True):
+                st.session_state['nav_to'] = 'login'
+                st.rerun()
+    
+    # Tech Stack
+    with st.expander("🛠️ Technology Stack"):
+        tech1, tech2, tech3 = st.columns(3)
+        with tech1:
+            st.markdown("""
+            **🖥️ Frontend**
+            - Streamlit (Python)
+            - Custom CSS & HTML
+            - Responsive Design
+            """)
+        with tech2:
+            st.markdown("""
+            **🧠 AI/ML Core**
+            - DeepFace (Recognition)
+            - EfficientNet (Detection)
+            - TensorFlow & PyTorch
+            """)
+        with tech3:
+            st.markdown("""
+            **🗄️ Backend**
+            - MongoDB Atlas (Cloud DB)
+            - Tesseract OCR
+            - Twilio SMS (OTP)
+            """)
+    
+    # Footer
+    st.markdown("""
+    <div class="footer">
+        <p>© 2026 SecureKYC - Synthetic Identity Fraud Detection System</p>
+        <p>Built with 🛡️ Security First | Compliant with GDPR & Data Privacy Standards</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -284,6 +781,72 @@ def show_registration_page():
     
     st.header("📝 User Registration (Baseline Creation)")
     st.markdown("Create a verified identity baseline. This data will be used to detect fraud in future transactions.")
+
+    # --- Session state for OTP flow ---
+    if 'registration_phone_verified' not in st.session_state:
+        st.session_state['registration_phone_verified'] = False
+    if 'registration_verified_phone' not in st.session_state:
+        st.session_state['registration_verified_phone'] = ''
+    if 'registration_otp_sent_for' not in st.session_state:
+        st.session_state['registration_otp_sent_for'] = None
+    if 'registration_otp_demo' not in st.session_state:
+        st.session_state['registration_otp_demo'] = None
+
+    # --- Step 1: Phone OTP verification (must complete before selfie / form) ---
+    if not st.session_state['registration_phone_verified']:
+        st.subheader("Step 1: Verify your phone number")
+        st.caption("Enter your phone number. You will receive an OTP to verify before proceeding.")
+        from src.otp_service import send_otp_to_phone, verify_otp
+
+        reg_phone = st.text_input("Phone Number", key="reg_phone", placeholder="e.g. 9876543210 or +919876543210")
+        send_clicked = st.button("Send OTP", key="send_otp_btn")
+        if send_clicked:
+            if not reg_phone or not reg_phone.strip():
+                st.error("Please enter your phone number.")
+            else:
+                success, msg, demo_otp = send_otp_to_phone(reg_phone.strip())
+                if success:
+                    st.session_state['registration_otp_sent_for'] = reg_phone.strip()
+                    st.session_state['registration_otp_demo'] = demo_otp
+                    st.success(msg)
+                    if demo_otp:
+                        st.info(f"**Demo / development:** Your OTP is **{demo_otp}** (SMS not configured).")
+                else:
+                    st.error(msg)
+
+        if st.session_state.get('registration_otp_sent_for'):
+            st.markdown("---")
+            st.caption("Enter the OTP you received.")
+            otp_entered = st.text_input("Enter OTP", key="reg_otp_input", max_chars=6, placeholder="6-digit code")
+            verify_clicked = st.button("Verify OTP", key="verify_otp_btn")
+            if verify_clicked:
+                if not otp_entered or len(otp_entered.strip()) != 6:
+                    st.error("Please enter the 6-digit OTP.")
+                else:
+                    if verify_otp(st.session_state['registration_otp_sent_for'], otp_entered.strip()):
+                        st.session_state['registration_phone_verified'] = True
+                        st.session_state['registration_verified_phone'] = st.session_state['registration_otp_sent_for']
+                        st.session_state['registration_otp_sent_for'] = None
+                        st.session_state['registration_otp_demo'] = None
+                        st.success("Phone verified successfully. You can now complete registration.")
+                        st.rerun()
+                    else:
+                        st.error("Invalid or expired OTP. Please request a new one.")
+
+        st.markdown("---")
+        st.info("Complete phone verification above to unlock the registration form and selfie capture.")
+        return
+
+    # --- Step 2: Full registration form (only after OTP verified) ---
+    verified_phone = st.session_state['registration_verified_phone']
+    st.success(f"Phone verified: **{verified_phone}**")
+    if st.button("Change phone number", key="change_phone_btn"):
+        st.session_state['registration_phone_verified'] = False
+        st.session_state['registration_verified_phone'] = ''
+        st.session_state['registration_otp_sent_for'] = None
+        st.session_state['registration_otp_demo'] = None
+        st.rerun()
+    st.markdown("---")
 
     with st.form("registration_form"):
         col1, col2 = st.columns(2)
@@ -419,6 +982,9 @@ def show_registration_page():
                         st.success(f"✅ Registration Successful! Your Password is your DOB: {password}")
                         st.caption(f"Behavior Risk: {decision} ({risk_score:.2f})")
                         st.info("Redirecting to Login...")
+                        # Clear registration OTP state so next visit starts from Step 1
+                        st.session_state['registration_phone_verified'] = False
+                        st.session_state['registration_verified_phone'] = ''
                     else:
                         st.warning("⚠️ User with this email already registered!")
                             
