@@ -473,9 +473,21 @@ def show_verification_page():
                     cropped_face = face_verifier.detect_face(selfie_img)
                     if cropped_face is not None:
                         live_embedding = face_verifier.get_embedding(cropped_face)
-                        stored_embedding = user_record.get('face_embedding')
+                        stored_embedding_raw = user_record.get('face_embedding')
                         
-                        if live_embedding is not None and stored_embedding:
+                        # Convert stored embedding from database (might be bytes, list, or Binary)
+                        stored_embedding = None
+                        if stored_embedding_raw:
+                            if isinstance(stored_embedding_raw, (list, np.ndarray)):
+                                stored_embedding = np.array(stored_embedding_raw, dtype=np.float32)
+                            elif isinstance(stored_embedding_raw, bytes):
+                                # If stored as bytes, convert back to numpy array
+                                try:
+                                    stored_embedding = np.frombuffer(stored_embedding_raw, dtype=np.float32)
+                                except:
+                                    st.warning("Could not decode stored embedding from bytes.")
+                        
+                        if live_embedding is not None and stored_embedding is not None:
                             match_score, face_decision = face_verifier.verify_with_stored_embedding(live_embedding, stored_embedding)
                         else:
                             st.warning("Could not generate embeddings for comparison.")
@@ -518,12 +530,23 @@ def show_verification_page():
                 # Log attempt
                 final_decision = "APPROVED" if (doc_result['decision'] == "APPROVE" and face_decision == "VERIFIED" and is_live) else "REJECTED"
                 
+                # Safe conversion for scores
+                try:
+                    face_score_val = float(match_score) if match_score and match_score != b'' else 0.0
+                except (ValueError, TypeError):
+                    face_score_val = 0.0
+                    
+                try:
+                    liveness_score_val = float(liveness_score) if liveness_score and liveness_score != b'' else 0.0
+                except (ValueError, TypeError):
+                    liveness_score_val = 0.0
+                
                 attempt_data = {
                     "user_id": user_record.get('_id'), # MongoDB ObjectId
                     "user_email": current_email,
                     "doc_score": doc_result['doc_risk_score'],
-                    "face_score": float(match_score),
-                    "liveness_score": float(liveness_score),
+                    "face_score": face_score_val,
+                    "liveness_score": liveness_score_val,
                     "final_decision": final_decision,
                     "details": str(doc_result)
                 }

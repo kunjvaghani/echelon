@@ -8,7 +8,7 @@ from deepface import DeepFace
 # Load environment variables from ../../.env (relative to this file)
 current_dir = pathlib.Path(__file__).parent.resolve()
 env_path = current_dir.parent.parent / '.env'
-load_dotenv(dotenv_path=env_path)
+load_dotenv(dotenv_path=env_path, override=True)
 
 class FaceVerifier:
     def __init__(self):
@@ -110,7 +110,7 @@ class FaceVerifier:
         # Real cameras usually produce sharp images > 100-300 variance.
         # Blurred screens/printed photos often drop below 50-60.
         # Setting a conservative threshold to satisfy "effective method".
-        LIVENESS_THRESHOLD = float(os.getenv("LIVENESS_THRESHOLD", 50.0)) 
+        LIVENESS_THRESHOLD = float(os.getenv("LIVENESS_THRESHOLD", "50.0") or 50.0) 
         
         is_live = laplacian_var > LIVENESS_THRESHOLD
         
@@ -187,8 +187,8 @@ class FaceVerifier:
         cos_sim = max(-1.0, min(1.0, cos_sim))
         
         # 6. Decision Thresholds
-        verified_thresh = float(os.getenv("VERIFICATION_THRESHOLD_VERIFIED", 0.75))
-        review_thresh = float(os.getenv("VERIFICATION_THRESHOLD_REVIEW", 0.60))
+        verified_thresh = float(os.getenv("VERIFICATION_THRESHOLD_VERIFIED", "0.75") or 0.75)
+        review_thresh = float(os.getenv("VERIFICATION_THRESHOLD_REVIEW", "0.60") or 0.60)
 
         if cos_sim >= verified_thresh:
             decision = "VERIFIED"
