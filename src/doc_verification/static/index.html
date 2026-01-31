@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 3: Document Verification | Echeleon e-KYC</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #1a1a2e 100%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 2rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .upload-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .upload-zone svg {
+            width: 48px;
+            height: 48px;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .upload-zone p {
+            color: var(--text-muted);
+        }
+
+        #preview-container {
+            display: none;
+            margin-bottom: 1.5rem;
+        }
+
+        #preview-container img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        button {
+            width: 100%;
+            padding: 1rem 2rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 1rem;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result-card {
+            display: none;
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .decision {
+            font-size: 1.5rem;
+            font-weight: 700;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+        }
+
+        .decision.approve {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .decision.reject {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .decision.review {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .risk-score {
+            text-align: right;
+        }
+
+        .risk-score .label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .risk-score .value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .scores-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .score-item {
+            background: var(--bg-dark);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .score-item .name {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .score-item .value {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .score-bar {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+
+        .score-bar .fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        .flags-section h3 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+        }
+
+        .flag {
+            padding: 0.75rem 1rem;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .ocr-data {
+            margin-top: 1.5rem;
+        }
+
+        .ocr-data h3 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+        }
+
+        .ocr-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .ocr-item .field {
+            color: var(--text-muted);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid var(--danger);
+            border-radius: 8px;
+            padding: 1rem;
+            color: var(--danger);
+            display: none;
+            margin-top: 1rem;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔒 Phase 3: Document Verification</h1>
+            <p class="subtitle">AI-Powered Document Analysis for e-KYC</p>
+        </header>
+
+        <div class="grid">
+            <!-- Upload Card -->
+            <div class="card">
+                <h2>📄 Upload Document</h2>
+                
+                <form id="verification-form">
+                    <div id="upload-zone" class="upload-zone">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p>Drag & drop document image or click to browse</p>
+                        <input type="file" id="document-input" accept="image/*" hidden>
+                    </div>
+
+                    <div id="preview-container">
+                        <img id="preview-image" src="" alt="Document preview">
+                    </div>
+
+                    <h3 style="font-size: 1rem; color: var(--text-muted); margin-bottom: 1rem;">User Details (Optional)</h3>
+                    
+                    <div class="form-group">
+                        <label for="user-name">Full Name</label>
+                        <input type="text" id="user-name" placeholder="As it appears on document">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="user-dob">Date of Birth</label>
+                        <input type="date" id="user-dob">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="user-id">ID Number (Aadhaar/PAN/etc.)</label>
+                        <input type="text" id="user-id" placeholder="Document ID number">
+                    </div>
+
+                    <button type="submit" id="verify-btn" disabled>
+                        🔍 Verify Document
+                    </button>
+                </form>
+
+                <div class="error-message" id="error-message"></div>
+            </div>
+
+            <!-- Results Card -->
+            <div class="card result-card" id="result-card">
+                <h2>📊 Verification Results</h2>
+                
+                <div class="result-header">
+                    <div class="decision" id="decision-badge">PENDING</div>
+                    <div class="risk-score">
+                        <div class="label">Risk Score</div>
+                        <div class="value" id="risk-score-value">--</div>
+                    </div>
+                </div>
+
+                <div class="scores-grid">
+                    <div class="score-item">
+                        <div class="name">Quality</div>
+                        <div class="value" id="quality-score">--</div>
+                        <div class="score-bar">
+                            <div class="fill" id="quality-bar" style="width: 0%; background: var(--success);"></div>
+                        </div>
+                    </div>
+                    <div class="score-item">
+                        <div class="name">Forgery Risk</div>
+                        <div class="value" id="forgery-score">--</div>
+                        <div class="score-bar">
+                            <div class="fill" id="forgery-bar" style="width: 0%; background: var(--danger);"></div>
+                        </div>
+                    </div>
+                    <div class="score-item">
+                        <div class="name">Data Match</div>
+                        <div class="value" id="mismatch-score">--</div>
+                        <div class="score-bar">
+                            <div class="fill" id="mismatch-bar" style="width: 0%; background: var(--warning);"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flags-section">
+                    <h3>🚩 Verification Flags</h3>
+                    <div id="flags-container"></div>
+                </div>
+
+                <div class="ocr-data">
+                    <h3>📝 Extracted Data (OCR)</h3>
+                    <div id="ocr-container"></div>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div class="card" id="loading-card" style="display: none;">
+                <div class="loading" style="display: block;">
+                    <div class="spinner"></div>
+                    <p>Analyzing document...</p>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.5rem;">
+                        Running quality check, forgery detection, OCR, and rule validation
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Echeleon e-KYC System | Phase 3: Document Verification</p>
+        </footer>
+    </div>
+
+    <script>
+        const uploadZone = document.getElementById('upload-zone');
+        const fileInput = document.getElementById('document-input');
+        const previewContainer = document.getElementById('preview-container');
+        const previewImage = document.getElementById('preview-image');
+        const verifyBtn = document.getElementById('verify-btn');
+        const form = document.getElementById('verification-form');
+        const resultCard = document.getElementById('result-card');
+        const loadingCard = document.getElementById('loading-card');
+        const errorMessage = document.getElementById('error-message');
+
+        let selectedFile = null;
+
+        // Upload zone click
+        uploadZone.addEventListener('click', () => fileInput.click());
+
+        // Drag and drop
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleFile(file);
+            }
+        });
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            selectedFile = file;
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewContainer.style.display = 'block';
+                uploadZone.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+            
+            verifyBtn.disabled = false;
+        }
+
+        // Form submit
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!selectedFile) return;
+
+            // Show loading
+            resultCard.style.display = 'none';
+            loadingCard.style.display = 'block';
+            errorMessage.style.display = 'none';
+            verifyBtn.disabled = true;
+
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('document', selectedFile);
+            
+            const userName = document.getElementById('user-name').value;
+            const userDob = document.getElementById('user-dob').value;
+            const userId = document.getElementById('user-id').value;
+            
+            if (userName) formData.append('user_name', userName);
+            if (userDob) formData.append('user_dob', userDob);
+            if (userId) formData.append('user_id_number', userId);
+
+            try {
+                const response = await fetch('/verify-document', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    displayResults(result);
+                } else {
+                    showError(result.message || 'Verification failed');
+                }
+            } catch (error) {
+                showError('Connection error: ' + error.message);
+            } finally {
+                loadingCard.style.display = 'none';
+                verifyBtn.disabled = false;
+            }
+        });
+
+        function displayResults(result) {
+            resultCard.style.display = 'block';
+
+            // Decision badge
+            const decisionBadge = document.getElementById('decision-badge');
+            decisionBadge.textContent = result.decision;
+
+            decisionBadge.className = 'decision';
+            if (result.decision === 'APPROVE') {
+                decisionBadge.classList.add('approve');
+            } else if (result.decision === 'REJECT') {
+                decisionBadge.classList.add('reject');
+            } else {
+                decisionBadge.classList.add('review');
+            }
+
+            // Risk score
+            document.getElementById('risk-score-value').textContent = 
+                (result.doc_risk_score * 100).toFixed(0) + '%';
+
+            // Component scores
+            const scores = result.scores || {};
+            
+            const qualityScore = (scores.quality_score || 0);
+            document.getElementById('quality-score').textContent = (qualityScore * 100).toFixed(0) + '%';
+            document.getElementById('quality-bar').style.width = (qualityScore * 100) + '%';
+
+            const forgeryScore = (scores.forgery_score || 0);
+            document.getElementById('forgery-score').textContent = (forgeryScore * 100).toFixed(0) + '%';
+            document.getElementById('forgery-bar').style.width = (forgeryScore * 100) + '%';
+
+            const mismatchScore = 1 - (scores.mismatch_score || 0);
+            document.getElementById('mismatch-score').textContent = (mismatchScore * 100).toFixed(0) + '%';
+            document.getElementById('mismatch-bar').style.width = (mismatchScore * 100) + '%';
+
+            // Flags
+            const flagsContainer = document.getElementById('flags-container');
+            flagsContainer.innerHTML = '';
+            (result.flags || []).forEach(flag => {
+                const div = document.createElement('div');
+                div.className = 'flag';
+                div.textContent = flag;
+                flagsContainer.appendChild(div);
+            });
+
+            // OCR data
+            const ocrContainer = document.getElementById('ocr-container');
+            ocrContainer.innerHTML = '';
+            
+            if (result.details && result.details.ocr && result.details.ocr.extracted_data) {
+                const data = result.details.ocr.extracted_data;
+
+                const fields = [
+                    { label: 'Name', value: data.name },
+                    { label: 'Date of Birth', value: data.dob },
+                    { label: 'ID Number', value: data.id_number },
+                    { label: 'ID Type', value: data.id_type }
+                ];
+                
+                fields.forEach(field => {
+                    const div = document.createElement('div');
+                    div.className = 'ocr-item';
+                    div.innerHTML = `
+                        <span class="field">${field.label}</span>
+                        <span>${field.value || 'Not detected'}</span>
+                    `;
+                    ocrContainer.appendChild(div);
+                });
+            }
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

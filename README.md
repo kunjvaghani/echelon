@@ -9,7 +9,7 @@ This project is an **AI-driven e-KYC system** designed to detect synthetic ident
 ## Setup Instructions
 
 ### 1. Prerequisites
-- Python 3.8+
+- Python 3.10–3.11 (TensorFlow is not available for Python 3.12+ on Windows)
 - [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki) installed and added to PATH.
 
 ### 2. Installation
