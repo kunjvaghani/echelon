@@ -1,0 +1,12 @@
+streamlit
+pandas
+numpy
+opencv-python-headless
+deepface
+tf-keras
+scikit-learn
+torch; sys_platform == "win32"
+tensorflow; sys_platform == "win32"
+pytesseract
+Pillow
+fpdf

@@ -1,0 +1,238 @@
+PROJECT TITLE:
+Synthetic Identity Fraud Detection in Automated e-KYC Systems
+
+GOAL:
+Detect synthetic identities by correlating document authenticity,
+face biometrics, and behavioral patterns using pretrained ML models.
+
+====================================================
+TECH STACK
+====================================================
+
+Frontend + App:
+- Streamlit (UI, webcam capture, uploads)
+
+Backend / ML:
+- Python
+- OpenCV
+- DeepFace
+- Tesseract OCR
+- Scikit-learn
+- PyTorch / TensorFlow (for pretrained models)
+
+Database:
+- MongoDB (or SQLite for demo)
+
+====================================================
+SYSTEM ARCHITECTURE
+====================================================
+
+Streamlit App
+   |
+   |--> Face Verification Module (Pretrained)
+   |--> Document Verification Module (Pretrained)
+   |--> Behavioral Analysis Module
+   |--> Fraud Decision Engine
+   |
+Database (User + KYC History)
+
+====================================================
+PHASE 1: USER REGISTRATION (BASELINE IDENTITY)
+====================================================
+
+USER ACTION:
+- Open Streamlit app
+- Fill registration form
+- Capture live selfie via webcam
+
+SYSTEM ACTION:
+
+1. Face Detection
+   Model: MTCNN (pretrained)
+   Input: Selfie image
+   Output: Cropped face
+
+2. Face Embedding
+   Model: FaceNet / ArcFace (via DeepFace)
+   Input: Cropped face
+   Output: Face embedding vector
+
+3. Behavioral Capture
+   - Typing speed
+   - Time per field
+   - Total form time
+
+STORE IN DATABASE:
+- user_id
+- face_embedding_baseline
+- behavior_baseline
+- registration_timestamp
+
+(No model training required)
+
+====================================================
+PHASE 2: START e-KYC VERIFICATION
+====================================================
+
+USER ACTION:
+- Login
+- Upload ID document image
+- Capture new live selfie
+- Submit for verification
+
+====================================================
+PHASE 3: DOCUMENT VERIFICATION PIPELINE
+====================================================
+
+1. Document Quality Check
+   Model: OpenCV
+   Checks:
+   - Blur detection
+   - Resolution check
+   - Crop/screenshot detection
+   Output: quality_score
+
+2. AI-Generated / Forged Document Detection
+   Model: EfficientNet / XceptionNet (pretrained)
+   Input: Document image
+   Output: forgery_score
+
+3. OCR Text Extraction
+   Model: Tesseract OCR
+   Input: Document image
+   Output:
+   - Name
+   - DOB
+   - ID number
+
+4. Rule-Based Validation (No ML)
+   - OCR text vs user input
+   - DOB logic
+   - ID format checks
+   Output: content_mismatch_score
+
+DOCUMENT RISK SCORE:
+doc_risk_score =
+  quality_score +
+  forgery_score +
+  content_mismatch_score
+
+====================================================
+PHASE 4: FACE BIOMETRIC VERIFICATION
+====================================================
+
+1. Face Detection
+   Model: MTCNN
+   Input: Live selfie
+   Output: Cropped face
+
+2. Face Embedding
+   Model: FaceNet / ArcFace
+   Output: Live face embedding
+
+3. Face Matching
+   Method: Cosine Similarity
+   Compare:
+   baseline_embedding vs live_embedding
+
+Output:
+- face_match_score
+
+====================================================
+PHASE 5: BEHAVIORAL VERIFICATION
+====================================================
+
+Input:
+- Registration behavior baseline
+- Current e-KYC behavior
+
+Model Options:
+- Isolation Forest
+- Statistical distance (mean/std)
+
+Output:
+- behavior_deviation_score
+
+====================================================
+PHASE 6: MULTI-MODAL FRAUD FUSION
+====================================================
+
+FEATURE VECTOR:
+[
+ doc_risk_score,
+ 1 - face_match_score,
+ behavior_deviation_score,
+ identity_reuse_score
+]
+
+FINAL FRAUD MODEL:
+- Random Forest / XGBoost
+
+(This is the ONLY model that may be trained lightly)
+
+Output:
+- fraud_probability (0 to 1)
+
+====================================================
+PHASE 7: DECISION ENGINE
+====================================================
+
+If fraud_probability > 0.75:
+  Decision = REJECT
+
+If fraud_probability between 0.45 and 0.75:
+  Decision = MANUAL REVIEW
+
+If fraud_probability < 0.45:
+  Decision = APPROVE
+
+====================================================
+PHASE 8: USER OUTPUT (STREAMLIT UI)
+====================================================
+
+Display:
+- KYC Status
+- Fraud Risk Score
+- Explanation
+
+Example:
+"Verification Failed
+Reasons:
+- Face mismatch
+- AI-generated document risk
+- Behavioral anomaly"
+
+====================================================
+ML MODELS USED (SUMMARY)
+====================================================
+
+Face Detection:
+- MTCNN (Pretrained)
+
+Face Verification:
+- FaceNet / ArcFace (Pretrained via DeepFace)
+
+Document Forgery Detection:
+- EfficientNet / XceptionNet (Pretrained)
+
+OCR:
+- Tesseract OCR (Pretrained)
+
+Behavior Analysis:
+- Isolation Forest / Statistical methods
+
+Final Decision:
+- Random Forest / XGBoost (Light training)
+
+====================================================
+WHY THIS PROJECT IS UNIQUE
+====================================================
+
+- Uses identity baseline across time
+- Multi-modal correlation (document + face + behavior)
+- Risk-based decision instead of binary output
+- Robust against AI-generated synthetic identities
+
+====================================================
+END OF WORKFLOW
+====================================================
