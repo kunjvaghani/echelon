@@ -1,6 +1,8 @@
 import streamlit as st
 import os
 import sys
+import time
+from datetime import date
 from PIL import Image
 import numpy as np
 import cv2
@@ -229,6 +231,72 @@ def show_registration_page():
     st.header("📝 User Registration (Baseline Creation)")
     st.markdown("Create a verified identity baseline. This data will be used to detect fraud in future transactions.")
 
+    # --- Session state for OTP flow ---
+    if 'registration_phone_verified' not in st.session_state:
+        st.session_state['registration_phone_verified'] = False
+    if 'registration_verified_phone' not in st.session_state:
+        st.session_state['registration_verified_phone'] = ''
+    if 'registration_otp_sent_for' not in st.session_state:
+        st.session_state['registration_otp_sent_for'] = None
+    if 'registration_otp_demo' not in st.session_state:
+        st.session_state['registration_otp_demo'] = None
+
+    # --- Step 1: Phone OTP verification (must complete before selfie / form) ---
+    if not st.session_state['registration_phone_verified']:
+        st.subheader("Step 1: Verify your phone number")
+        st.caption("Enter your phone number. You will receive an OTP to verify before proceeding.")
+        from src.otp_service import send_otp_to_phone, verify_otp
+
+        reg_phone = st.text_input("Phone Number", key="reg_phone", placeholder="e.g. 9876543210 or +919876543210")
+        send_clicked = st.button("Send OTP", key="send_otp_btn")
+        if send_clicked:
+            if not reg_phone or not reg_phone.strip():
+                st.error("Please enter your phone number.")
+            else:
+                success, msg, demo_otp = send_otp_to_phone(reg_phone.strip())
+                if success:
+                    st.session_state['registration_otp_sent_for'] = reg_phone.strip()
+                    st.session_state['registration_otp_demo'] = demo_otp
+                    st.success(msg)
+                    if demo_otp:
+                        st.info(f"**Demo / development:** Your OTP is **{demo_otp}** (SMS not configured).")
+                else:
+                    st.error(msg)
+
+        if st.session_state.get('registration_otp_sent_for'):
+            st.markdown("---")
+            st.caption("Enter the OTP you received.")
+            otp_entered = st.text_input("Enter OTP", key="reg_otp_input", max_chars=6, placeholder="6-digit code")
+            verify_clicked = st.button("Verify OTP", key="verify_otp_btn")
+            if verify_clicked:
+                if not otp_entered or len(otp_entered.strip()) != 6:
+                    st.error("Please enter the 6-digit OTP.")
+                else:
+                    if verify_otp(st.session_state['registration_otp_sent_for'], otp_entered.strip()):
+                        st.session_state['registration_phone_verified'] = True
+                        st.session_state['registration_verified_phone'] = st.session_state['registration_otp_sent_for']
+                        st.session_state['registration_otp_sent_for'] = None
+                        st.session_state['registration_otp_demo'] = None
+                        st.success("Phone verified successfully. You can now complete registration.")
+                        st.rerun()
+                    else:
+                        st.error("Invalid or expired OTP. Please request a new one.")
+
+        st.markdown("---")
+        st.info("Complete phone verification above to unlock the registration form and selfie capture.")
+        return
+
+    # --- Step 2: Full registration form (only after OTP verified) ---
+    verified_phone = st.session_state['registration_verified_phone']
+    st.success(f"Phone verified: **{verified_phone}**")
+    if st.button("Change phone number", key="change_phone_btn"):
+        st.session_state['registration_phone_verified'] = False
+        st.session_state['registration_verified_phone'] = ''
+        st.session_state['registration_otp_sent_for'] = None
+        st.session_state['registration_otp_demo'] = None
+        st.rerun()
+    st.markdown("---")
+
     with st.form("registration_form"):
         col1, col2 = st.columns(2)
         
@@ -236,8 +304,15 @@ def show_registration_page():
             st.subheader("1. Personal Details")
             full_name = st.text_input("Full Name (as on ID)")
             email = st.text_input("Email Address (Unique ID)")
-            dob = st.date_input("Date of Birth") # Default format YYYY-MM-DD
-            phone = st.text_input("Phone Number")
+            dob = st.date_input(
+                "Date of Birth",
+                min_value=date(1970, 1, 1),
+                max_value=date(2026, 12, 31),
+                value=date(1990, 1, 1),
+            )
+            # Phone is read-only; already verified
+            st.text_input("Phone Number (verified)", value=verified_phone, disabled=True, key="reg_phone_verified_display")
+            phone = verified_phone
         
         with col2:
             st.subheader("2. Identity Document")
@@ -346,6 +421,9 @@ def show_registration_page():
                         st.success(f"✅ Registration Successful! Your Password is your DOB: {password}")
                         st.caption(f"Behavior Risk: {decision} ({risk_score:.2f})")
                         st.info("Redirecting to Login...")
+                        # Clear registration OTP state so next visit starts from Step 1
+                        st.session_state['registration_phone_verified'] = False
+                        st.session_state['registration_verified_phone'] = ''
                     else:
                         st.warning("⚠️ User with this email already registered!")
                             
