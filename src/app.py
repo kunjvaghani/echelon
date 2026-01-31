@@ -1,9 +1,15 @@
 import streamlit as st
 import os
 import sys
+from PIL import Image
+import numpy as np
+import cv2
 
 # Add project root to path so 'src' module can be found
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from src.face_verification.face_utils import FaceVerifier
+from src.doc_verification.doc_utils import DocumentVerifier
 
 # Set page config
 st.set_page_config(
@@ -11,6 +17,19 @@ st.set_page_config(
     page_icon="🛡️",
     layout="wide"
 )
+
+@st.cache_resource
+def get_models():
+    """Load and cache models to avoid reloading on every interaction"""
+    face_verifier = FaceVerifier()
+    doc_verifier = DocumentVerifier()
+    return face_verifier, doc_verifier
+
+def load_image(image_file):
+    """Convert Streamlit file buffer to OpenCV BGR format"""
+    image = Image.open(image_file)
+    image = np.array(image.convert('RGB'))
+    return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
 def main():
     # --- Session State Initialization ---
@@ -22,17 +41,27 @@ def main():
         st.session_state['user_name'] = ''
 
     # --- Top Navbar ---
-    # Define available pages based on auth status
-    if st.session_state['logged_in']:
-        if st.session_state['user_role'] == 'admin':
-            menu_options = ["Home", "Verify (e-KYC)", "Admin Dashboard", "Logout"]
+    col1, col2 = st.columns([4, 1])
+    
+    with col1:
+        # Define available pages based on auth status
+        if st.session_state['logged_in']:
+            if st.session_state['user_role'] == 'admin':
+                menu_options = ["Home", "Verify (e-KYC)", "Admin Dashboard", "Logout"]
+            else:
+                menu_options = ["Home", "Verify (e-KYC)", "Logout"]
         else:
-            menu_options = ["Home", "Verify (e-KYC)", "Logout"]
-    else:
-        menu_options = ["Home", "Register", "Login"]
+            menu_options = ["Home", "Register", "Login"]
 
-    # Use a horizontal radio button as a Navbar equivalent
-    selected_page = st.radio("", menu_options, horizontal=True, label_visibility="collapsed")
+        # Use a horizontal radio button as a Navbar equivalent
+        selected_page = st.radio("", menu_options, horizontal=True, label_visibility="collapsed")
+
+    with col2:
+        if st.session_state['logged_in']:
+            # Minimal user profile display
+            st.markdown(f"<div style='text-align: right; padding-top: 5px;'>👤 <b>{st.session_state['user_name']}</b></div>", unsafe_allow_html=True)
+            # st.caption(f"Role: {st.session_state['user_role']}")
+    
     st.markdown("---") # Separator
 
     # --- Page Routing ---
@@ -108,80 +137,89 @@ def inject_behavior_script():
 # --- Page Functions ---
 
 def show_home_page():
-    # st.title("🛡️ Synthetic Identity Fraud Detection System")
-    st.markdown("### 🚀 Next-Gen AI Powered e-KYC Verification")
+    # Hero Section
+    st.markdown("""
+    <div style="text-align: center; padding: 40px 0;">
+        <h1 style="font-size: 3rem; margin-bottom: 10px;">🛡️ Synthetic Identity Fraud Detection</h1>
+        <p style="font-size: 1.2rem; color: #888;">Next-Gen AI Powered e-KYC Verification System</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.markdown("---")
 
-    # --- Feature Cards ---
+    # --- Feature Cards (Modern Glassmorphism Style) ---
     st.subheader("🌟 Core Capabilities")
+    
+    # Custom CSS for cards
+    card_style = """
+    <div style="
+        background-color: #1e1e1e; 
+        padding: 25px; 
+        border-radius: 15px; 
+        border: 1px solid #333; 
+        text-align: center; 
+        height: 100%;
+        transition: transform 0.2s;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    ">
+        <div style="font-size: 3rem; margin-bottom: 15px;">ICON_PLACEHOLDER</div>
+        <h3 style="margin-bottom: 10px; color: #fff;">TITLE_PLACEHOLDER</h3>
+        <p style="color: #aaa; font-size: 0.95rem;">DESC_PLACEHOLDER</p>
+    </div>
+    """
+    
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown("""
-        <div style="padding: 20px; border: 1px solid #333; border-radius: 10px; text-align: center;">
-            <h1>📄</h1>
-            <h3>Doc Forgery</h3>
-            <p>Detects AI-generated IDs & edits using <b>EfficientNet</b> & <b>ELA Analysis</b>.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(card_style.replace("ICON_PLACEHOLDER", "📄").replace("TITLE_PLACEHOLDER", "Doc Forgery Detection").replace("DESC_PLACEHOLDER", "Detects AI-generated IDs, Photoshop edits, and metadata anomalies using <b>EfficientNet</b> & <b>ELA Analysis</b>."), unsafe_allow_html=True)
         
     with col2:
-        st.markdown("""
-        <div style="padding: 20px; border: 1px solid #333; border-radius: 10px; text-align: center;">
-            <h1>👤</h1>
-            <h3>Face Biometrics</h3>
-            <p>Ensures liveness & identity match using <b>DeepFace</b> & <b>Anti-Spoofing</b>.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(card_style.replace("ICON_PLACEHOLDER", "👤").replace("TITLE_PLACEHOLDER", "Biometric Verification").replace("DESC_PLACEHOLDER", "Ensures liveness & identity match. Prevents spoofing attacks using <b>DeepFace</b> & <b>Anti-Spoofing</b> algorithms."), unsafe_allow_html=True)
 
     with col3:
-        st.markdown("""
-        <div style="padding: 20px; border: 1px solid #333; border-radius: 10px; text-align: center;">
-            <h1>🖱️</h1>
-            <h3>Behavioral Patterns</h3>
-            <p>Tracks value input speed & anomalies to flag <b>Bot-like interactions</b>.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(card_style.replace("ICON_PLACEHOLDER", "🖱️").replace("TITLE_PLACEHOLDER", "Behavioral Analysis").replace("DESC_PLACEHOLDER", "Tracks session metadata, typing speed, and cursor patterns to flag <b>Bot-like interactions</b>."), unsafe_allow_html=True)
 
-    st.markdown("---")
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
     # --- Pipeline Visualization ---
-    st.subheader("🔄 End-to-End Verification Pipeline")
-    st.info("The system processes users through a multi-stage security filter:")
+    st.subheader("🔄 End-to-End Security Pipeline")
+    st.info("The system processes users through a multi-stage security filter to ensure maximum integrity.")
     
-    steps = ["1. User Registration", "2. Document Scan (OCR + Forgery)", "3. Liveness Check", "4. Behavior Analysis", "5. Fraud Risk Scoring", "6. Final Decision"]
-    st.progress(100)
-    st.write(" ➡️ ".join(steps))
+    # Custom Step Process
+    st.markdown("""
+    <div style="display: flex; justify-content: space-between; align-items: center; background: #0e1117; padding: 20px; border-radius: 10px; overflow-x: auto;">
+        <div style="text-align: center; min-width: 100px;">📝<br><small>Register</small></div>
+        <div style="font-size: 1.5rem;">➡️</div>
+        <div style="text-align: center; min-width: 100px;">📷<br><small>Doc Scan</small></div>
+        <div style="font-size: 1.5rem;">➡️</div>
+        <div style="text-align: center; min-width: 100px;">😐<br><small>Liveness</small></div>
+        <div style="font-size: 1.5rem;">➡️</div>
+        <div style="text-align: center; min-width: 100px;">🤖<br><small>Behavior</small></div>
+        <div style="font-size: 1.5rem;">➡️</div>
+        <div style="text-align: center; min-width: 100px;">✅<br><small>Decision</small></div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # --- Project Roadmap / About ---
-    with st.expander("🗺️ Project Roadmap & Architecture"):
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # --- Tech Stack / About ---
+    with st.expander("🛠️ Under the Hood (Tech Stack)"):
         st.markdown("""
-        - **Phase 1**: Core Module Implementation (Face, Doc, Behavior)
-        - **Phase 2**: Integration & Testing
-        - **Phase 3**: Polish & Real-world Piloting
-        
-        *Built with Streamlit, OpenCV, DeepFace, and Scikit-learn.*
+        - **Frontend**: Streamlit (Python)
+        - **Face Recognition**: DeepFace (FaceNet / VGG-Face)
+        - **Document Analysis**: Tesseract OCR, ELA (Error Level Analysis)
+        - **Database**: MongoDB Atlas (Cloud)
+        - **ML Core**: TensorFlow, PyTorch, Scikit-learn
         """)
-
+        
     st.markdown("---")
 
-    # --- Footer: Guidelines ---
-    st.subheader("🏛️ Government KYC Guidelines")
-    f_col1, f_col2 = st.columns(2)
-    
-    with f_col1:
-        st.markdown("**✅ How to perform valid KYC:**")
-        st.markdown("- Ensure lighting is sufficient for selfies.")
-        st.markdown("- ID Documents must be placed on a plain dark background.")
-        st.markdown("- Do not wear sunglasses or hats during verification.")
-    
-    with f_col2:
-        st.markdown("**⚠️ Common Rejection Reasons:**")
-        st.markdown("- Blurry or cropped ID images.")
-        st.markdown("- Mismatch between ID photo and live face.")
-        st.markdown("- Suspiciously fast form filling (Bot detected).")
-    
-    st.caption("© 2026 Synthetic Fraud Detection Team. Compliant with Data Privacy Standards.")
+    # --- Footer ---
+    st.markdown("""
+    <div style="text-align: center; padding: 20px; color: #666; font-size: 0.8rem;">
+        © 2026 Synthetic Fraud Detection Team | Compliant with GDPR & Data Privacy Standards
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def show_registration_page():
@@ -264,6 +302,27 @@ def show_registration_page():
                         "reasons": reasons,
                         "session_id": session_id
                     })
+                    # 3. Generate Real Face Embedding
+                    face_verifier, _ = get_models()
+                    
+                    # Convert selfie for processing
+                    selfie_cv2 = load_image(selfie_image)
+                    
+                    # Detect and embed
+                    cropped_face = face_verifier.detect_face(selfie_cv2)
+                    if cropped_face is None:
+                        st.error("⚠️ No face detected in selfie! Please try again.")
+                        st.stop()
+                        
+                    real_embedding = face_verifier.get_embedding(cropped_face)
+                    if real_embedding is None:
+                        st.error("⚠️ Could not generate face embedding. Low quality image?")
+                        st.stop()
+                        
+                    # Convert numpy array to list for MongoDB storage (binary is okay too, but list is safer for JSON)
+                    embedding_list = real_embedding.tolist()
+                    
+                    dummy_behavior = "{'avg_flight': 0.2}"
 
                     # 4. Save to MongoDB
                     password = str(dob).replace("-", "") # Format: YYYYMMDD
@@ -278,6 +337,8 @@ def show_registration_page():
                         "password": password,
                         "face_embedding": dummy_embedding, 
                         "behavior_baseline": behavior_baseline,
+                        "face_embedding": embedding_list, # Storing real embedding
+                        "behavior_baseline": dummy_behavior,
                         "role": "user"
                     }
 
@@ -323,6 +384,7 @@ def show_login_page():
                 st.session_state['logged_in'] = True
                 st.session_state['user_name'] = user.get('full_name', 'User')
                 st.session_state['user_role'] = user.get('role', 'user')
+                st.session_state['user_email'] = user.get('email')
                 st.success(f"Welcome back, {user.get('full_name')}!")
                 if decision == "MANUAL_REVIEW":
                     st.warning("⚠️ Security Note: Unusual interaction pattern detected.")
@@ -335,6 +397,150 @@ def show_verification_page():
 
     st.header("e-KYC Verification")
     st.info("Verification module coming soon...")
+    st.header("🕵️ e-KYC Verification")
+    st.markdown("Verify your identity by uploading your ID and taking a live selfie.")
+
+    # Load Models
+    with st.spinner("Loading AI Models..."):
+        face_verifier, doc_verifier = get_models()
+
+    # Layout
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("1. Document Upload")
+        doc_file = st.file_uploader("Upload ID Document", type=['jpg', 'jpeg', 'png'])
+        
+    with col2:
+        st.subheader("2. Live Liveness Check")
+        live_selfie = st.camera_input("Take a Selfie")
+
+    # Verify Button
+    if st.button("🚀 Run Verification"):
+        if not doc_file or not live_selfie:
+            st.error("Please provide both ID Document and Live Selfie.")
+        else:
+            try:
+                # --- Step 1: Pre-processing ---
+                doc_img = load_image(doc_file)
+                selfie_img = load_image(live_selfie)
+                
+                user_email = st.session_state.get('user_name', '') # Using name as placeholder, but ideally need email from session
+                # FIX: We need email to fetch stored embedding. 
+                # Assuming 'user_email' was added to session during login attempt earlier. 
+                # If not, we might fail. Let's try fetching user from DB using session info if available.
+                
+                # Retrieve stored user data
+                from src.database.db_connection import Database
+                db = Database()
+                # We need the logged in user's email.
+                # In login we set: st.session_state['user_email'] (I added this in previous turn logic)
+                current_email = st.session_state.get('user_email')
+                
+                if not current_email:
+                    st.error("Session Error: Could not identify logged-in user.")
+                    return
+
+                user_record = db.get_user(current_email)
+                db.close()
+                
+                if not user_record:
+                    st.error("User record not found in database.")
+                    return
+
+                # --- Step 2: Document Verification ---
+                st.info("Analyzing Document...")
+                # We can pass user info to validate against OCR text
+                user_info = {
+                    "name": user_record.get('full_name'),
+                    "dob": user_record.get('dob'),
+                    "id_number": user_record.get('document_id')
+                }
+                
+                doc_result = doc_verifier.verify_document(doc_img, user_data=user_info)
+                
+                # --- Step 3: Face Verification ---
+                st.info("Verifying Face & Liveness...")
+                
+                # Liveness
+                is_live, liveness_score = face_verifier.check_liveness(selfie_img)
+                
+                # Matching
+                match_score = 0.0
+                face_decision = "FAIL"
+                
+                if is_live:
+                    cropped_face = face_verifier.detect_face(selfie_img)
+                    if cropped_face is not None:
+                        live_embedding = face_verifier.get_embedding(cropped_face)
+                        stored_embedding = user_record.get('face_embedding')
+                        
+                        if live_embedding is not None and stored_embedding:
+                            match_score, face_decision = face_verifier.verify_with_stored_embedding(live_embedding, stored_embedding)
+                        else:
+                            st.warning("Could not generate embeddings for comparison.")
+                    else:
+                        st.warning("Face not detected in selfie.")
+                else:
+                    st.warning("⚠️ Liveness Check Failed! Possible spoof detected.")
+
+                # --- Step 4: Display Results ---
+                st.write("---")
+                st.subheader("📝 Verification Report")
+                
+                res_col1, res_col2 = st.columns(2)
+                
+                with res_col1:
+                    st.markdown("#### 📄 Document Analysis")
+                    st.write(f"**Status:** {doc_result['decision']}")
+                    st.write(f"**Risk Score:** {doc_result['doc_risk_score']}")
+                    
+                    with st.expander("View Details"):
+                        st.json(doc_result)
+                        
+                    if doc_result['decision'] == "APPROVE":
+                        st.success("Document Verified ✅")
+                    elif doc_result['decision'] == "MANUAL_REVIEW":
+                        st.warning("Document Needs Review ⚠️")
+                    else:
+                        st.error("Document Rejected ❌")
+
+                with res_col2:
+                    st.markdown("#### 👤 Biometric Analysis")
+                    st.write(f"**Liveness:** {'PASS ✅' if is_live else 'FAIL ❌'} ({liveness_score:.2f})")
+                    st.write(f"**Face Match:** {face_decision} ({match_score:.2f})")
+                    
+                    if face_decision == "VERIFIED" and is_live:
+                         st.success("Identity Verified ✅")
+                    else:
+                         st.error("Identity Verification Failed ❌")
+                
+                # Log attempt
+                final_decision = "APPROVED" if (doc_result['decision'] == "APPROVE" and face_decision == "VERIFIED" and is_live) else "REJECTED"
+                
+                attempt_data = {
+                    "user_id": user_record.get('_id'), # MongoDB ObjectId
+                    "user_email": current_email,
+                    "doc_score": doc_result['doc_risk_score'],
+                    "face_score": float(match_score),
+                    "liveness_score": float(liveness_score),
+                    "final_decision": final_decision,
+                    "details": str(doc_result)
+                }
+                
+                # Log to DB
+                db = Database()
+                db.log_kyc_attempt(attempt_data)
+                db.close()
+                
+                if final_decision == "APPROVED":
+                    st.balloons()
+                    st.success("🎉 KYC VERIFICATION SUCCESSFUL!")
+                else:
+                    st.error("⛔ KYC VERIFICATION FAILED. Please try again or contact support.")
+
+            except Exception as e:
+                st.error(f"An error occurred during verification: {e}")
 
 def show_admin_page():
     st.header("📊 Admin Dashboard")
