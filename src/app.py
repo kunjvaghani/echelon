@@ -433,14 +433,15 @@ def main():
 # --- Behavioral Analysis Integration ---
 import streamlit.components.v1 as components
 from src.behavior_analysis.behavior_utils import BehaviorServer
+from src.auth_service import AuthService
 import uuid
 
-# Initialize Background Server (Singleton)
+# Initialize Services (Singleton)
 @st.cache_resource
-def init_behavior_server():
-    return BehaviorServer()
+def init_services():
+    return BehaviorServer(), AuthService()
 
-behavior_server = init_behavior_server()
+behavior_server, auth_service = init_services()
 
 def inject_behavior_script():
     """
@@ -782,71 +783,8 @@ def show_registration_page():
     st.header("📝 User Registration (Baseline Creation)")
     st.markdown("Create a verified identity baseline. This data will be used to detect fraud in future transactions.")
 
-    # --- Session state for OTP flow ---
-    if 'registration_phone_verified' not in st.session_state:
-        st.session_state['registration_phone_verified'] = False
-    if 'registration_verified_phone' not in st.session_state:
-        st.session_state['registration_verified_phone'] = ''
-    if 'registration_otp_sent_for' not in st.session_state:
-        st.session_state['registration_otp_sent_for'] = None
-    if 'registration_otp_demo' not in st.session_state:
-        st.session_state['registration_otp_demo'] = None
-
-    # --- Step 1: Phone OTP verification (must complete before selfie / form) ---
-    if not st.session_state['registration_phone_verified']:
-        st.subheader("Step 1: Verify your phone number")
-        st.caption("Enter your phone number. You will receive an OTP to verify before proceeding.")
-        from src.otp_service import send_otp_to_phone, verify_otp
-
-        reg_phone = st.text_input("Phone Number", key="reg_phone", placeholder="e.g. 9876543210 or +919876543210")
-        send_clicked = st.button("Send OTP", key="send_otp_btn")
-        if send_clicked:
-            if not reg_phone or not reg_phone.strip():
-                st.error("Please enter your phone number.")
-            else:
-                success, msg, demo_otp = send_otp_to_phone(reg_phone.strip())
-                if success:
-                    st.session_state['registration_otp_sent_for'] = reg_phone.strip()
-                    st.session_state['registration_otp_demo'] = demo_otp
-                    st.success(msg)
-                    if demo_otp:
-                        st.info(f"**Demo / development:** Your OTP is **{demo_otp}** (SMS not configured).")
-                else:
-                    st.error(msg)
-
-        if st.session_state.get('registration_otp_sent_for'):
-            st.markdown("---")
-            st.caption("Enter the OTP you received.")
-            otp_entered = st.text_input("Enter OTP", key="reg_otp_input", max_chars=6, placeholder="6-digit code")
-            verify_clicked = st.button("Verify OTP", key="verify_otp_btn")
-            if verify_clicked:
-                if not otp_entered or len(otp_entered.strip()) != 6:
-                    st.error("Please enter the 6-digit OTP.")
-                else:
-                    if verify_otp(st.session_state['registration_otp_sent_for'], otp_entered.strip()):
-                        st.session_state['registration_phone_verified'] = True
-                        st.session_state['registration_verified_phone'] = st.session_state['registration_otp_sent_for']
-                        st.session_state['registration_otp_sent_for'] = None
-                        st.session_state['registration_otp_demo'] = None
-                        st.success("Phone verified successfully. You can now complete registration.")
-                        st.rerun()
-                    else:
-                        st.error("Invalid or expired OTP. Please request a new one.")
-
-        st.markdown("---")
-        st.info("Complete phone verification above to unlock the registration form and selfie capture.")
-        return
-
-    # --- Step 2: Full registration form (only after OTP verified) ---
-    verified_phone = st.session_state['registration_verified_phone']
-    st.success(f"Phone verified: **{verified_phone}**")
-    if st.button("Change phone number", key="change_phone_btn"):
-        st.session_state['registration_phone_verified'] = False
-        st.session_state['registration_verified_phone'] = ''
-        st.session_state['registration_otp_sent_for'] = None
-        st.session_state['registration_otp_demo'] = None
-        st.rerun()
-    st.markdown("---")
+    # --- Registration Form ---
+    st.markdown("### Enter your details")
 
     with st.form("registration_form"):
         col1, col2 = st.columns(2)
@@ -861,21 +799,20 @@ def show_registration_page():
         with col2:
             st.subheader("2. Identity Document")
             doc_type = st.selectbox("Select Document Type", ["Aadhaar Card"])
-            doc_id_number = st.text_input(f"{doc_type} Number")
+            doc_id_number = st.text_input(f"{doc_type} Number", max_chars=12, placeholder="12-digit Aadhaar Number")
             uploaded_file = st.file_uploader(f"Upload {doc_type} Image (Max 2MB)", type=['jpg', 'jpeg', 'png'])
             
             if uploaded_file is not None and uploaded_file.size > 2 * 1024 * 1024:
                 st.error("❌ File size exceeds 2MB limit. Please upload a smaller file.")
                 uploaded_file = None
             
-        st.subheader("3. Biometric Baseline")
+        st.subheader("3. Biometric & Security")
         st.info("Look straight into the camera and ensure good lighting.")
         selfie_image = st.camera_input("Capture Live Selfie")
 
         submitted = st.form_submit_button("🚀 Register Identity")
 
         # -- Backend Connection --
-        from src.database.db_connection import Database
         from src.config import DATA_DIR
         import os
         
@@ -891,22 +828,20 @@ def show_registration_page():
             
             elif decision == "MANUAL_REVIEW":
                 st.warning(f"⚠️ Unusual Behavior Detected ({risk_score:.2f}). Flagged for manual review.")
-                # We typically proceed but mark the user flag. For this demo, we allow it.
             
             if not full_name or not email or not uploaded_file or not selfie_image or not doc_id_number:
                 st.error("❌ Please fill all fields including Document ID and capture both document and selfie.")
             elif not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email):
                 st.error("❌ Please enter a valid email address.")
+            elif not re.match(r"^\d{12}$", doc_id_number):
+                st.error("❌ Aadhaar Number must be exactly 12 digits.")
             elif not re.match(r"^\d{2}/\d{2}/\d{4}$", dob):
                 st.error("❌ Please enter Date of Birth in DD/MM/YYYY format.")
             elif not re.match(r"^\d{10}$", phone):
                 st.error("❌ Phone Number must be exactly 10 digits.")
             else:
                 try:
-                    # 1. Initialize DB (Creates folders & tables if missing)
-                    db = Database()
-                    
-                    # 2. Save Images locally
+                    # 1. Save Images locally
                     user_folder = os.path.join(DATA_DIR, "users", email)
                     os.makedirs(user_folder, exist_ok=True)
                     
@@ -920,7 +855,7 @@ def show_registration_page():
                     with open(selfie_path, "wb") as f:
                         f.write(selfie_image.getbuffer())
 
-                    # 3. Simulate Embeddings/Behavior
+                    # 2. Simulate Embeddings/Behavior
                     dummy_embedding = b'\\x00' * 128 
                     
                     # Store the Real Behavioral Baseline
@@ -941,28 +876,26 @@ def show_registration_page():
                     cropped_face = face_verifier.detect_face(selfie_cv2)
                     if cropped_face is None:
                         st.error("⚠️ No face detected in selfie! Please try again.")
-                        st.stop()
+                        return 
                         
                     real_embedding = face_verifier.get_embedding(cropped_face)
                     if real_embedding is None:
                         st.error("⚠️ Could not generate face embedding. Low quality image?")
-                        st.stop()
+                        return
                         
-                    # Convert numpy array to list for MongoDB storage (binary is okay too, but list is safer for JSON)
+                    # Convert numpy array to list for MongoDB storage
                     embedding_list = real_embedding.tolist()
                     
                     dummy_behavior = "{'avg_flight': 0.2}"
 
-                    # 4. Save to MongoDB
-                    # password = str(dob).replace("-", "") # Format: YYYYMMDD
-                    # process dob from DD/MM/YYYY to YYYYMMDD
+                    # 4. Create User Data Dict
+                    # Auto-generate password from DOB (YYYYMMDD)
                     try:
                         d, m, y = dob.split('/')
                         password = f"{y}{m}{d}"
                     except:
-                        # Fallback if regex somehow passed but split fails (unlikely)
                         password = dob.replace("/", "")
-                    
+
                     user_data = {
                         "email": email,
                         "full_name": full_name,
@@ -970,28 +903,57 @@ def show_registration_page():
                         "phone": phone,
                         "document_type": doc_type,
                         "document_id": doc_id_number,
-                        "password": password,
-                        "face_embedding": dummy_embedding, 
+                        "password": password, # Will be hashed by AuthService
+                        "face_embedding": embedding_list, 
                         "behavior_baseline": behavior_baseline,
-                        "face_embedding": embedding_list, # Storing real embedding
-                        "behavior_baseline": dummy_behavior,
                         "role": "user"
                     }
 
-                    if db.create_user(user_data):
-                        st.success(f"✅ Registration Successful! Your Password is your DOB: {password}")
+                    # 5. Register via AuthService
+                    success, msg = auth_service.register_user(user_data)
+                    
+                    if success:
+                        st.success(f"✅ {msg}")
                         st.caption(f"Behavior Risk: {decision} ({risk_score:.2f})")
-                        st.info("Redirecting to Login...")
-                        # Clear registration OTP state so next visit starts from Step 1
-                        st.session_state['registration_phone_verified'] = False
-                        st.session_state['registration_verified_phone'] = ''
+                        
+                        # Store email in session for the verification step
+                        st.session_state['reg_email'] = email
+                        st.session_state['reg_awaiting_verification'] = True
+
                     else:
-                        st.warning("⚠️ User with this email already registered!")
-                            
-                    db.close()
+                        st.error(f"⚠️ Registration Failed: {msg}")
                 
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
+
+    # --- Post-Registration Verification Step ---
+    if st.session_state.get('reg_awaiting_verification') and st.session_state.get('reg_email'):
+        st.divider()
+        st.subheader("✅ Final Step: Verify Email")
+        st.info(f"An OTP has been sent to **{st.session_state['reg_email']}**. Enter it below to complete registration.")
+        
+        with st.form("reg_verify_form"):
+            otp_code = st.text_input("Enter Verification Code", max_chars=6)
+            verify_btn = st.form_submit_button("Verify & Login")
+            
+            if verify_btn:
+                success, msg, user = auth_service.verify_login_otp(st.session_state['reg_email'], otp_code)
+                if success:
+                    st.session_state['logged_in'] = True
+                    st.session_state['user_name'] = user.get('full_name', 'User')
+                    st.session_state['user_role'] = user.get('role', 'user')
+                    st.session_state['user_email'] = user.get('email')
+                    
+                    # Clear reg state
+                    st.session_state['reg_awaiting_verification'] = False
+                    st.session_state['reg_email'] = None
+                    
+                    st.balloons()
+                    st.success("🎉 Verification Successful! Logging you in...")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error(msg)
 
 def show_login_page():
     # Inject Behavior Tracker
@@ -999,37 +961,78 @@ def show_login_page():
 
     st.header("🔐 User Login")
     
-    with st.form("login_form"):
-        email = st.text_input("Email Address")
-        password = st.text_input("Password (DOB YYYYMMDD)", type="password")
-        submitted = st.form_submit_button("Login")
-        
-        if submitted:
-            # --- Behavioral Fraud Check ---
-            session_id = st.session_state.get('behavior_session_id')
-            risk_score, decision, reasons = behavior_server.get_score(session_id)
-            
-            if decision == "REJECT":
-                st.error(f"⛔ Login Blocked: Suspicious Bot-like Behavior. Reasons: {', '.join(reasons)}")
-                return
+def show_login_page():
+    # Inject Behavior Tracker
+    inject_behavior_script()
+
+    st.header("🔐 User Login")
+
+    # Single Container for Login Flow
+    login_container = st.container()
+    
+    with login_container:
+        # Initialize state
+        if 'login_otp_step' not in st.session_state:
+            st.session_state['login_otp_step'] = 1
+        if 'login_otp_email' not in st.session_state:
+            st.session_state['login_otp_email'] = ""
+
+        # --- STEP 1: Enter Email ---
+        if st.session_state['login_otp_step'] == 1:
+            with st.form("login_step1_form"):
+                email_input = st.text_input("Enter your Registered Email", value=st.session_state['login_otp_email'])
+                sent = st.form_submit_button("Send Verification Code")
                 
-            from src.database.db_connection import Database
-            db = Database()
-            user = db.verify_user(email, password)
-            db.close()
+                if sent:
+                    if not email_input:
+                        st.error("Please enter your email.")
+                    else:
+                        # Behavioral Check
+                        session_id = st.session_state.get('behavior_session_id')
+                        risk_score, decision, reasons = behavior_server.get_score(session_id)
+                        
+                        if decision == "REJECT":
+                            st.error(f"⛔ Login Blocked: Suspicious Behavior. ({risk_score:.2f})")
+                        else:
+                            success, msg = auth_service.send_login_otp(email_input)
+                            if success:
+                                st.session_state['login_otp_email'] = email_input
+                                st.session_state['login_otp_step'] = 2
+                                st.success(msg)
+                                st.rerun()
+                            else:
+                                st.error(msg)
+        
+        # --- STEP 2: Enter OTP ---
+        elif st.session_state['login_otp_step'] == 2:
+            st.info(f"msg sent to **{st.session_state['login_otp_email']}**")
             
-            if user:
-                # User found: user is now a dict
-                st.session_state['logged_in'] = True
-                st.session_state['user_name'] = user.get('full_name', 'User')
-                st.session_state['user_role'] = user.get('role', 'user')
-                st.session_state['user_email'] = user.get('email')
-                st.success(f"Welcome back, {user.get('full_name')}!")
-                if decision == "MANUAL_REVIEW":
-                    st.warning("⚠️ Security Note: Unusual interaction pattern detected.")
-                st.rerun()
-            else:
-                st.error("Invalid Credentials")
+            with st.form("login_step2_form"):
+                otp_input = st.text_input("Enter Verification Code", max_chars=6)
+                col_b1, col_b2 = st.columns([1, 1])
+                with col_b1:
+                    change_email = st.form_submit_button("Change Email")
+                with col_b2:
+                    verify = st.form_submit_button("Verify & Login")
+                
+                if change_email:
+                    st.session_state['login_otp_step'] = 1
+                    st.rerun()
+                
+                if verify:
+                    success, msg, user = auth_service.verify_login_otp(st.session_state['login_otp_email'], otp_input)
+                    if success:
+                        st.session_state['logged_in'] = True
+                        st.session_state['user_name'] = user.get('full_name', 'User')
+                        st.session_state['user_role'] = user.get('role', 'user')
+                        st.session_state['user_email'] = user.get('email')
+                        
+                        st.balloons()
+                        st.success(f"✅ Login Successful! Welcome {user.get('full_name')}")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error(msg)
 
 def show_verification_page():
 

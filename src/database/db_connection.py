@@ -30,15 +30,42 @@ class Database:
     def create_user(self, user_data):
         """
         Inserts a new user into MongoDB.
-        user_data: dict containing full_name, email, dob, phone, password, 
-                   face_embedding (binary), behavior_baseline, role, created_at
+        user_data: dict containing full_name, email, dob, phone, password_hash, 
+                   face_embedding (binary), behavior_baseline, role, created_at, is_verified, otp, otp_expiry
         """
         user_data['created_at'] = datetime.datetime.now()
+        # Ensure default fields if not present
+        if 'is_verified' not in user_data:
+            user_data['is_verified'] = False
+        if 'role' not in user_data:
+            user_data['role'] = 'user'
+            
         try:
             self.users.insert_one(user_data)
             return True
         except pymongo.errors.DuplicateKeyError:
             return False
+
+    def update_user_verification(self, email, is_verified):
+        """Updates the is_verified status of a user."""
+        result = self.users.update_one(
+            {"email": email},
+            {"$set": {"is_verified": is_verified}}
+        )
+        return result.modified_count > 0
+
+    def store_otp(self, email, otp, expiry_time):
+        """Stores OTP and its expiry for a user."""
+        result = self.users.update_one(
+            {"email": email},
+            {"$set": {"otp": otp, "otp_expiry": expiry_time}}
+        )
+        return result.modified_count > 0
+
+    def get_user_otp(self, email):
+        """Retrieves OTP and expiry for a user."""
+        user = self.users.find_one({"email": email}, {"otp": 1, "otp_expiry": 1, "_id": 0})
+        return user if user else None
 
     def get_user(self, email):
         """
@@ -47,14 +74,13 @@ class Database:
         """
         return self.users.find_one({"email": email})
 
-    def verify_user(self, email, password):
+    def get_user_by_credentials(self, email):
         """
-        Verifies login credentials.
-        Returns: dict user object or None
+        Fetches user by email to verify credentials. 
+        Password check should be done by the service using hash.
         """
-        # In production, use hashed passwords!
-        return self.users.find_one({"email": email, "password": password})
-    
+        return self.users.find_one({"email": email})
+
     def get_all_users(self):
         """Returns list of all users for Admin Dashboard"""
         return list(self.users.find({}, {"_id": 0, "face_embedding": 0})) # Exclude binary data for display
