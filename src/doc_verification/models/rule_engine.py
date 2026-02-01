@@ -111,9 +111,16 @@ class RuleEngine:
             'messages': []
         }
         
-        try:
-            user_date = datetime.strptime(user_dob, '%Y-%m-%d').date()
-        except (ValueError, TypeError):
+        # Try parsing user_dob in multiple formats
+        user_date = None
+        for date_format in ['%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%d/%Y']:
+            try:
+                user_date = datetime.strptime(user_dob, date_format).date()
+                break
+            except (ValueError, TypeError):
+                continue
+        
+        if user_date is None:
             result['messages'].append('Invalid user DOB format')
             return result
         
@@ -142,9 +149,16 @@ class RuleEngine:
             result['mismatch_score'] = 0.5
             return result
         
-        try:
-            ocr_date = datetime.strptime(ocr_dob, '%Y-%m-%d').date()
-        except (ValueError, TypeError):
+        # Try parsing ocr_dob in multiple formats
+        ocr_date = None
+        for date_format in ['%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%d/%Y']:
+            try:
+                ocr_date = datetime.strptime(ocr_dob, date_format).date()
+                break
+            except (ValueError, TypeError):
+                continue
+        
+        if ocr_date is None:
             result['messages'].append('Could not parse OCR DOB')
             result['mismatch_score'] = 0.5
             return result
