@@ -38,3 +38,6 @@ secrets.toml
 data/
 *.db
 *.sqlite3
+
+ps.txt
+website_prmpt.txt
