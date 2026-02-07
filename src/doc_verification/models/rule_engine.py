@@ -36,8 +36,41 @@ class RuleEngine:
     def __init__(self):
         self.config = RULE_CONFIG
     
+    def _levenshtein_ratio(self, s1: str, s2: str) -> float:
+        """
+        Calculate Levenshtein ratio for string similarity.
+        Returns 0.0 to 1.0 (1.0 = identical).
+        """
+        if not s1 or not s2:
+            return 0.0
+            
+        rows = len(s1) + 1
+        cols = len(s2) + 1
+        distance = [[0 for _ in range(cols)] for _ in range(rows)]
+
+        for i in range(1, rows):
+            distance[i][0] = i
+        for k in range(1, cols):
+            distance[0][k] = k
+
+        for col in range(1, cols):
+            for row in range(1, rows):
+                if s1[row - 1] == s2[col - 1]:
+                    cost = 0
+                else:
+                    cost = 1
+                distance[row][col] = min(distance[row - 1][col] + 1,      # deletion
+                                         distance[row][col - 1] + 1,      # insertion
+                                         distance[row - 1][col - 1] + cost) # substitution
+
+        max_len = max(len(s1), len(s2))
+        if max_len == 0:
+            return 1.0
+            
+        return 1.0 - (distance[rows - 1][cols - 1] / max_len)
+
     def compare_names(self, ocr_name: Optional[str], user_name: str) -> Dict:
-        """Compare names using fuzzy matching"""
+        """Compare names using robust fuzzy matching"""
         if not ocr_name:
             return {
                 'score': 0.0,
@@ -49,33 +82,35 @@ class RuleEngine:
         ocr_normalized = self._normalize_name(ocr_name)
         user_normalized = self._normalize_name(user_name)
         
-        if len(ocr_normalized) < 2 or len(user_normalized) < 2:
-            return {
-                'score': 0.0,
-                'match': False,
-                'message': 'Name too short for reliable matching',
-                'mismatch_score': 1.0
+        # 1. Exact Match Check
+        if ocr_normalized == user_normalized:
+             return {
+                'score': 1.0,
+                'match': True,
+                'message': 'Names match exactly',
+                'mismatch_score': 0.0
             }
+
+        # 2. Token Set Ratio (Handles "Kunj Vaghani" vs "Vaghani Kunj")
+        ocr_tokens = set(ocr_normalized.split())
+        user_tokens = set(user_normalized.split())
         
-        length_diff = abs(len(ocr_normalized) - len(user_normalized))
-        max_length = max(len(ocr_normalized), len(user_normalized))
-        length_ratio = length_diff / max_length if max_length > 0 else 0
+        common_tokens = ocr_tokens.intersection(user_tokens)
+        token_overlap = len(common_tokens) / max(len(ocr_tokens), len(user_tokens))
         
-        if length_ratio > 0.4:
-            return {
-                'score': 0.0,
-                'match': False,
-                'message': f'Name length mismatch: "{ocr_name}" vs "{user_name}"',
-                'mismatch_score': 1.0
-            }
+        # 3. Levenshtein Distance (Handles typos like "Kunj" vs "Kunj.")
+        lev_ratio = self._levenshtein_ratio(ocr_normalized, user_normalized)
         
-        if FUZZY_AVAILABLE:
-            ratio = fuzz.ratio(ocr_normalized, user_normalized) / 100
-            partial_ratio = fuzz.partial_ratio(ocr_normalized, user_normalized) / 100
-            token_sort = fuzz.token_sort_ratio(ocr_normalized, user_normalized) / 100
-            similarity = min(ratio, token_sort)
-        else:
-            similarity = self._basic_similarity(ocr_normalized, user_normalized)
+        # Combined Score
+        # We give more weight to Levenshtein if token overlap is low (typos)
+        # But if token overlap is high, it's good.
+        
+        similarity = max(token_overlap, lev_ratio)
+        
+        # Boost for partial contain (e.g. "Kunj" in "Kunj Vaghani")
+        if (len(ocr_normalized) > 3 and ocr_normalized in user_normalized) or \
+           (len(user_normalized) > 3 and user_normalized in ocr_normalized):
+            similarity = max(similarity, 0.95)
         
         threshold = self.config['name_match_threshold']
         is_match = similarity >= threshold
@@ -86,18 +121,13 @@ class RuleEngine:
             'match': is_match,
             'ocr_name': ocr_name,
             'user_name': user_name,
-            'message': 'Names match' if is_match else 'Name mismatch detected',
+            'message': f'Match Score: {similarity:.0%}' if is_match else f'Mismatch: {similarity:.0%}',
             'mismatch_score': round(mismatch_score, 3)
         }
     
     def _normalize_name(self, name: str) -> str:
         """Normalize name for comparison"""
         return ' '.join(name.upper().split())
-    
-    def _basic_similarity(self, str1: str, str2: str) -> float:
-        """Basic string similarity without external libs"""
-        common = sum(1 for a, b in zip(str1, str2) if a == b)
-        return common / max(len(str1), len(str2)) if max(len(str1), len(str2)) > 0 else 0.0
     
     def validate_dob(self, ocr_dob: Optional[str], user_dob: str) -> Dict:
         """Validate Date of Birth"""

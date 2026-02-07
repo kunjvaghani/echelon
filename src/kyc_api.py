@@ -368,7 +368,7 @@ def calculate_kyc_score():
     """
     Final KYC decision endpoint.
     Accepts JSON with scores from all verification phases.
-    Returns final aggregated decision.
+    Returns final aggregated decision with strict security gating.
     """
     try:
         data = request.get_json()
@@ -379,15 +379,73 @@ def calculate_kyc_score():
                 "error": "No JSON data provided"
             }), 400
         
-        # Extract scores (all should be 0.0 to 1.0, where lower is better for risk)
-        doc_score = data.get('doc_score', 0.5)  # Document risk score
-        face_score = data.get('face_score', 0.5)  # Face risk score (1 - liveness_confidence)
-        behavior_score = data.get('behavior_score', 0.5)  # Behavioral risk score
+        # Extract scores and decisions
+        doc_score = float(data.get('doc_score', 0.5))  # 0.0-1.0 (Lower is better generally, but depends on implementation)
+        # normalize doc score: input seems to be risk score (0=good, 1=bad)
+        
+        face_score = float(data.get('face_score', 0.0)) # 0.0-1.0
+        behavior_score = float(data.get('behavior_score', 0.5)) # 0.0-1.0
+        
+        # Critical Flags from steps
+        face_match_decision = data.get('face_match_decision', 'N/A') # VERIFIED, MANUAL_REVIEW, REJECTED, N/A
+        liveness_status = data.get('liveness_status', 'failed') # verified, failed
+        forgery_score = float(data.get('forgery_score', 0.0)) # 0.0 (good) to 1.0 (fake)
+        
+        print(f"[KYC] Evaluating: Doc={doc_score}, Face={face_score}, Beh={behavior_score}, "
+              f"Match={face_match_decision}, Live={liveness_status}, Forge={forgery_score}")
+
+        # =============================================================================
+        # 🚨 KILL SWITCH LOGIC (CRITICAL GATES)
+        # These conditions trigger immediate failure regardless of other scores
+        # =============================================================================
+        
+        rejection_reasons = []
+
+        # 1. Face Match Gate (If user exists in DB)
+        if face_match_decision == 'REJECTED':
+            rejection_reasons.append("Face mismatch: Selfie does not match registered profile.")
+        
+        # 2. Liveness Gate
+        if liveness_status != 'verified':
+            rejection_reasons.append("Liveness check failed: Possible spoofing attempt.")
+            
+        # 3. Forgery Gate
+        if forgery_score > 0.70:
+            rejection_reasons.append(f"Document forgery detected (Score: {forgery_score:.2f}).")
+            
+        # 4. Document Quality Gate (Implicit in doc_score if > 0.85)
+        if doc_score > 0.85:
+            rejection_reasons.append("Document quality too low or validation failed.")
+
+        # If any kill switch triggered, REJECT IMMEDIATELY
+        if rejection_reasons:
+            final_risk_score = 1.0 # Max risk
+            decision = 'REJECTED'
+            status = 'failed'
+            message = "Verification failed: " + "; ".join(rejection_reasons)
+            
+            return jsonify({
+                "success": True,
+                "final_risk_score": final_risk_score,
+                "decision": decision,
+                "status": status,
+                "message": message,
+                "breakdown": {
+                    "document": round(doc_score, 3),
+                    "face": round(face_score, 3),
+                    "behavior": round(behavior_score, 3),
+                    "identity_score": round(1.0 - face_score, 3) 
+                }
+            }), 200
+
+        # =============================================================================
+        # WEIGHTED SCORING (Only if strict gates passed)
+        # =============================================================================
         
         # Weights for final score
         WEIGHTS = {
-            'document': 0.35,
-            'face': 0.40,
+            'document': 0.30,
+            'face': 0.45,     # Increased weight for identity
             'behavior': 0.25
         }
         
@@ -398,19 +456,19 @@ def calculate_kyc_score():
             behavior_score * WEIGHTS['behavior']
         )
         
-        # Decision thresholds
-        if final_risk_score < 0.30:
+        # Final thresholds
+        if final_risk_score < 0.25:
             decision = 'APPROVED'
             status = 'success'
-            message = 'Identity verified successfully. All checks passed.'
-        elif final_risk_score < 0.55:
+            message = 'Identity verified successfully. Low risk.'
+        elif final_risk_score < 0.60:
             decision = 'MANUAL_REVIEW'
             status = 'pending'
-            message = 'Some verification checks require human review.'
+            message = 'Verification incomplete. Manual review required.'
         else:
             decision = 'REJECTED'
             status = 'failed'
-            message = 'Identity verification failed due to high risk indicators.'
+            message = 'Identity verification failed due to high aggregated risk.'
         
         return jsonify({
             "success": True,
@@ -421,13 +479,16 @@ def calculate_kyc_score():
             "breakdown": {
                 "document": round(doc_score, 3),
                 "face": round(face_score, 3),
-                "behavior": round(behavior_score, 3)
+                "behavior": round(behavior_score, 3),
+                "identity_score": round(1.0 - face_score, 3)
             },
             "weights": WEIGHTS
         }), 200
         
     except Exception as e:
         print(f"[ERROR] KYC score calculation failed: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "success": False,
             "error": str(e)

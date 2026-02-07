@@ -273,19 +273,40 @@ const KYCPipeline = () => {
                     await new Promise(resolve => setTimeout(resolve, 800));
                 }
 
-                // Submit behavioral data
+                // Submit behavioral data and get real score
+                let behaviorRiskScore = 0.5; // Default if fails
                 try {
-                    await submitBehavior(sessionId, behaviorEvents);
+                    const behaviorResult = await submitBehavior(sessionId, behaviorEvents);
+                    if (behaviorResult && behaviorResult.success) {
+                        behaviorRiskScore = behaviorResult.risk_score;
+                        console.log('[KYC] Behavior Score:', behaviorRiskScore);
+                    }
                 } catch (e) {
                     console.warn('Behavior submission failed:', e);
                 }
 
                 // Calculate final KYC score
                 try {
+                    // Face Score: Lower is better (Risk). 
+                    // If face_match_score (0-1 similarity) exists, risk is 1 - match.
+                    // If only liveness (0-1 confidence), risk is 1 - liveness.
+                    let faceRiskScore = 0.5;
+                    if (faceResult?.face_match_score !== undefined && faceResult?.face_match_score !== null) {
+                        // e.g. Match 0.9 -> Risk 0.1
+                        faceRiskScore = 1.0 - faceResult.face_match_score;
+                    } else if (faceResult?.liveness_confidence) {
+                        faceRiskScore = 1.0 - faceResult.liveness_confidence;
+                    }
+
                     const scores = {
                         doc_score: docResult?.risk_score || 0.5,
-                        face_score: faceResult?.is_live ? (1 - (faceResult?.liveness_confidence || 0.5)) : 0.8,
-                        behavior_score: 0.2 // Default low risk for now
+                        face_score: Math.max(0, Math.min(1, faceRiskScore)), // Clamp 0-1
+                        behavior_score: behaviorRiskScore,
+
+                        // Pass critical flags for Kill Switch
+                        face_match_decision: faceResult?.face_match_decision,
+                        liveness_status: livenessStatus, // 'verified' or 'failed'
+                        forgery_score: docResult?.forgery_score || 0
                     };
 
                     const result = await calculateKYCScore(scores);
@@ -679,32 +700,24 @@ const KYCPipeline = () => {
 
                                         {/* Detailed Score Breakdown */}
                                         <div className="score-breakdown">
-                                            <h4>Verification Scores</h4>
+                                            <h4>Transparency Scores (100% = Perfect)</h4>
                                             <div className="score-grid">
                                                 <div className="score-item">
                                                     <span className="score-label">Document Score</span>
                                                     <span className="score-value">
-                                                        {((1 - (docResult?.risk_score || 0.5)) * 100).toFixed(0)}%
+                                                        {((1 - (kycResult.breakdown?.document || 0.5)) * 100).toFixed(0)}%
                                                     </span>
                                                 </div>
                                                 <div className="score-item">
-                                                    <span className="score-label">Liveness Score</span>
+                                                    <span className="score-label">Identity Score</span>
                                                     <span className="score-value">
-                                                        {((faceResult?.liveness_confidence || 0) * 100).toFixed(0)}%
+                                                        {((kycResult.breakdown?.identity_score || 0) * 100).toFixed(0)}%
                                                     </span>
                                                 </div>
                                                 <div className="score-item">
-                                                    <span className="score-label">Face Match</span>
+                                                    <span className="score-label">Behavioral Score</span>
                                                     <span className="score-value">
-                                                        {faceResult?.face_match_score
-                                                            ? `${(faceResult.face_match_score * 100).toFixed(0)}%`
-                                                            : 'First KYC'}
-                                                    </span>
-                                                </div>
-                                                <div className="score-item">
-                                                    <span className="score-label">OCR Confidence</span>
-                                                    <span className="score-value">
-                                                        {((docResult?.ocr_data?.confidence || 0.5) * 100).toFixed(0)}%
+                                                        {((1 - (kycResult.breakdown?.behavior || 0.5)) * 100).toFixed(0)}%
                                                     </span>
                                                 </div>
                                             </div>
