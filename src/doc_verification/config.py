@@ -37,7 +37,7 @@ FORGERY_CONFIG = {
 # OCR CONFIGURATION
 # =============================================================================
 OCR_CONFIG = {
-    'lang': 'eng',
+    'lang': 'eng+hin',  # English + Hindi for Indian documents
     'psm': 6,
     'oem': 3,
 }
