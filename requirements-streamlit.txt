@@ -1,0 +1,28 @@
+streamlit==1.57.0
+pandas
+numpy
+opencv-python-headless
+# TensorFlow alternative: Use CPU-lite or lightweight models
+# Remove deepface due to TensorFlow incompatibility on Streamlit Cloud
+# Instead, use face_recognition which has fewer deps
+face-recognition
+face_recognition_models
+tf-keras
+scikit-learn
+pytesseract
+Pillow
+fpdf
+flask
+flask-cors
+werkzeug
+fuzzywuzzy
+python-dateutil
+extra-streamlit-components 
+pymongo
+python-dotenv
+dnspython
+pyopenssl>=23.2.0
+requests
+python-Levenshtein
+# Lightweight alternatives
+mediapipe>=0.8.9.1

@@ -1,24 +1,25 @@
-streamlit
-pandas
-numpy
-opencv-python-headless
-deepface
-tf-keras
-scikit-learn
-torch; sys_platform == "win32"
-tensorflow==2.15.0; sys_platform == "win32" and python_version < "3.12"
-pytesseract
-Pillow
-fpdf
-flask
-flask-cors
-werkzeug
-fuzzywuzzy
-python-dateutil
-extra-streamlit-components 
-pymongo
-python-dotenv
-dnspython
+streamlit>=1.28.0
+pandas>=1.5.0
+numpy>=1.21.0
+opencv-python-headless>=4.5.0
+scikit-learn>=1.0.0
+pytesseract>=0.3.10
+Pillow>=9.0.0
+fpdf>=1.7.2
+flask>=2.0.0
+flask-cors>=3.0.10
+werkzeug>=2.0.0
+fuzzywuzzy>=0.18.0
+python-dateutil>=2.8.0
+extra-streamlit-components>=0.1.50
+pymongo>=4.0.0
+python-dotenv>=0.19.0
+dnspython>=2.1.0
 pyopenssl>=23.2.0
-requests
-python-Levenshtein
+requests>=2.28.0
+python-Levenshtein>=0.21.0
+# Optional: ML models (install separately based on environment)
+# deepface (requires TensorFlow - Linux/macOS only)
+# tf-keras (requires TensorFlow - Windows/Linux)
+# torch (Windows only)
+mediapipe>=0.8.9.1
