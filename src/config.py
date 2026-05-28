@@ -11,7 +11,7 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "doc_verification", "upl
 DB_PATH = os.path.join(DATA_DIR, "kyc_database.db")
 
 # Thresholds
-FACE_MATCH_THRESHOLD = 0.40  # Cosine similarity
+FACE_MATCH_THRESHOLD = 0.80  # Cosine similarity
 FRAUD_PROBABILITY_THRESHOLD = 0.75
 
 # Flask Configuration

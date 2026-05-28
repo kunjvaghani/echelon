@@ -21,3 +21,4 @@ python-dotenv
 dnspython
 pyopenssl>=23.2.0
 requests
+python-Levenshtein

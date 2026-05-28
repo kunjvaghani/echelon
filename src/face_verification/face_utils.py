@@ -187,8 +187,9 @@ class FaceVerifier:
         cos_sim = max(-1.0, min(1.0, cos_sim))
         
         # 6. Decision Thresholds
-        verified_thresh = float(os.getenv("VERIFICATION_THRESHOLD_VERIFIED", "0.75") or 0.75)
-        review_thresh = float(os.getenv("VERIFICATION_THRESHOLD_REVIEW", "0.60") or 0.60)
+        # Stricter thresholds for security hardening
+        verified_thresh = float(os.getenv("VERIFICATION_THRESHOLD_VERIFIED", "0.80") or 0.80)
+        review_thresh = float(os.getenv("VERIFICATION_THRESHOLD_REVIEW", "0.65") or 0.65)
 
         if cos_sim >= verified_thresh:
             decision = "VERIFIED"

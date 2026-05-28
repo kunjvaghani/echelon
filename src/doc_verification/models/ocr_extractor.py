@@ -33,17 +33,35 @@ class OCRExtractor:
     
     def preprocess_image(self, image: np.ndarray) -> np.ndarray:
         """Preprocess image for better OCR accuracy"""
+        # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Resize if too small
         height, width = gray.shape
         if width < 600 or height < 400:
             scale_factor = max(600 / width, 400 / height)
             gray = cv2.resize(gray, None, fx=scale_factor, fy=scale_factor, 
                             interpolation=cv2.INTER_CUBIC)
         
-        filtered = cv2.bilateralFilter(gray, 9, 75, 75)
+        # Denoise the image
+        denoised = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
+        
+        # Apply bilateral filter to smooth while preserving edges
+        filtered = cv2.bilateralFilter(denoised, 9, 75, 75)
+        
+        # Enhance contrast using CLAHE
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         enhanced = clahe.apply(filtered)
-        _, thresh = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        
+        # Apply adaptive thresholding for better text detection
+        thresh = cv2.adaptiveThreshold(enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                       cv2.THRESH_BINARY, 11, 2)
+        
+        # Morphological operations to clean up
+        kernel = np.ones((1, 1), np.uint8)
+        thresh = cv2.dilate(thresh, kernel, iterations=1)
+        thresh = cv2.erode(thresh, kernel, iterations=1)
+        
         return thresh
     
     def extract_raw_text(self, image: np.ndarray) -> str:
