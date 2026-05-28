@@ -1,15 +1,47 @@
-import cv2
+import os
+import sys
+
+# Set environment for headless OpenCV (must be BEFORE cv2 import)
+os.environ['OPENCV_VIDEOIO_DEBUG'] = '0'
+os.environ['DISPLAY'] = ''
+
+# Handle OpenCV import with fallback
+try:
+    import cv2
+    HAS_CV2 = True
+except ImportError as e:
+    print(f"[WARNING] OpenCV not available: {e}")
+    HAS_CV2 = False
+    cv2 = None
+
 import numpy as np
 from typing import Dict, Optional
 
 # Import models from the models package
-from .models import (
-    DocumentQualityChecker,
-    ForgeryDetector,
-    OCRExtractor,
-    RuleEngine
-)
-from .config import SCORING_WEIGHTS, DECISION_CONFIG
+try:
+    from .models import (
+        DocumentQualityChecker,
+        ForgeryDetector,
+        OCRExtractor,
+        RuleEngine
+    )
+    MODELS_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARNING] Document verification models not available: {e}")
+    MODELS_AVAILABLE = False
+    DocumentQualityChecker = None
+    ForgeryDetector = None
+    OCRExtractor = None
+    RuleEngine = None
+
+try:
+    from .config import SCORING_WEIGHTS, DECISION_CONFIG
+    CONFIG_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARNING] Document config not available: {e}")
+    CONFIG_AVAILABLE = False
+    SCORING_WEIGHTS = {}
+    DECISION_CONFIG = {}
 
 
 class DocumentVerifier:

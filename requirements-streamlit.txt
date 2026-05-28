@@ -1,16 +1,12 @@
 streamlit==1.57.0
 pandas
 numpy
-opencv-python-headless
-# TensorFlow alternative: Use CPU-lite or lightweight models
-# Remove deepface due to TensorFlow incompatibility on Streamlit Cloud
-# Instead, use face_recognition which has fewer deps
-face-recognition
-face_recognition_models
-tf-keras
+# OpenCV MUST be headless version (no libGL dependency)
+opencv-python-headless>=4.5.0
+pillow
+# Remove opencv-python (conflicts with headless version)
 scikit-learn
 pytesseract
-Pillow
 fpdf
 flask
 flask-cors
@@ -24,5 +20,7 @@ dnspython
 pyopenssl>=23.2.0
 requests
 python-Levenshtein
-# Lightweight alternatives
+# Lightweight face detection (no TensorFlow required)
 mediapipe>=0.8.9.1
+# For graceful degradation on Streamlit Cloud
+altair

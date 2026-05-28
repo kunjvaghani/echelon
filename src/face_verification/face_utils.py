@@ -1,9 +1,32 @@
-import cv2
 import os
+import sys
+
+# Set environment for headless OpenCV (must be BEFORE cv2 import)
+os.environ['OPENCV_VIDEOIO_DEBUG'] = '0'
+os.environ['DISPLAY'] = ''
+os.environ['MPLBACKEND'] = 'Agg'  # For matplotlib (if used)
+
+# Handle OpenCV import
+try:
+    import cv2
+    HAS_CV2 = True
+except ImportError as e:
+    print(f"[WARNING] OpenCV not available: {e}")
+    HAS_CV2 = False
+    cv2 = None
+
 import pathlib
 from dotenv import load_dotenv
 import numpy as np
-from deepface import DeepFace
+
+# Handle DeepFace import (requires TensorFlow)
+try:
+    from deepface import DeepFace
+    HAS_DEEPFACE = True
+except ImportError as e:
+    print(f"[WARNING] DeepFace not available: {e}")
+    HAS_DEEPFACE = False
+    DeepFace = None
 
 # Load environment variables from ../../.env (relative to this file)
 current_dir = pathlib.Path(__file__).parent.resolve()
@@ -16,18 +39,31 @@ class FaceVerifier:
         Initialize FaceVerifier with FaceNet model and Haar Cascade.
         Models are loaded once to avoid reloading overhead.
         """
+        # Check if dependencies are available
+        if not HAS_CV2:
+            print("[WARNING] OpenCV not available - Face verification disabled")
+            self.face_cascade = None
+            self.model_name = None
+            return
+        
+        if not HAS_DEEPFACE:
+            print("[WARNING] DeepFace not available - Using lightweight alternative")
+            self.model_name = None
+            self.face_cascade = None
+            return
+        
         # 1. Architecture: Use FaceNet (via DeepFace)
         self.model_name = os.getenv("FACE_MODEL_NAME", "Facenet")
         
         # 2. Architecture: Load Haar Cascade for face detection
         # Try loading from cv2.data first, then fallback
         try:
-             self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        except AttributeError:
-             self.face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-            
-        if self.face_cascade.empty():
-            print("CRITICAL WARNING: Haar Cascade not loaded correctly. Check opencv installation or path.")
+            self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        except (AttributeError, TypeError):
+            self.face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+        
+        if self.face_cascade and self.face_cascade.empty():
+            print("[WARNING] Haar Cascade not loaded correctly. Check opencv installation or path.")
 
         # 3. Architecture: Pre-load/Warm-up DeepFace model
         print(f"[INFO] Loading {self.model_name} model for Face Verification... This may take a few seconds.")

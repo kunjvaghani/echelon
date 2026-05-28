@@ -6,13 +6,40 @@ import time
 from datetime import date
 from PIL import Image
 import numpy as np
-import cv2
+
+# Set environment for headless OpenCV (must be BEFORE cv2 import)
+os.environ['OPENCV_VIDEOIO_DEBUG'] = '0'
+os.environ['DISPLAY'] = ''  # Disable display requirement
+
+# OpenCV import with error handling
+try:
+    import cv2
+    HAS_CV2 = True
+except ImportError as e:
+    print(f"[WARNING] OpenCV import failed: {e}")
+    HAS_CV2 = False
+    # Provide alternative: use PIL for image processing
+    cv2 = None
 
 # Add project root to path so 'src' module can be found
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.face_verification.face_utils import FaceVerifier
-from src.doc_verification.doc_utils import DocumentVerifier
+# Try to load ML models - graceful fallback if not available
+try:
+    from src.face_verification.face_utils import FaceVerifier
+    HAS_FACE_VERIFIER = True
+except ImportError as e:
+    print(f"[WARNING] FaceVerifier not available: {e}")
+    HAS_FACE_VERIFIER = False
+    FaceVerifier = None
+
+try:
+    from src.doc_verification.doc_utils import DocumentVerifier
+    HAS_DOC_VERIFIER = True
+except ImportError as e:
+    print(f"[WARNING] DocumentVerifier not available: {e}")
+    HAS_DOC_VERIFIER = False
+    DocumentVerifier = None
 
 # Set page config
 st.set_page_config(
@@ -24,15 +51,43 @@ st.set_page_config(
 @st.cache_resource
 def get_models():
     """Load and cache models to avoid reloading on every interaction"""
-    face_verifier = FaceVerifier()
-    doc_verifier = DocumentVerifier()
+    if HAS_FACE_VERIFIER:
+        try:
+            face_verifier = FaceVerifier()
+        except Exception as e:
+            st.warning(f"⚠️ Face Verification Error: {e}")
+            face_verifier = None
+    else:
+        face_verifier = None
+        st.warning("⚠️ Face verification models not available on Streamlit Cloud")
+    
+    if HAS_DOC_VERIFIER:
+        try:
+            doc_verifier = DocumentVerifier()
+        except Exception as e:
+            st.warning(f"⚠️ Document Verification Error: {e}")
+            doc_verifier = None
+    else:
+        doc_verifier = None
+        st.warning("⚠️ Document verification models not available")
+    
     return face_verifier, doc_verifier
 
 def load_image(image_file):
     """Convert Streamlit file buffer to OpenCV BGR format"""
     image = Image.open(image_file)
     image = np.array(image.convert('RGB'))
-    return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+    
+    # Use cv2 if available, otherwise use numpy
+    if HAS_CV2 and cv2 is not None:
+        try:
+            return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        except Exception as e:
+            print(f"[WARNING] cv2 conversion failed: {e}, using PIL fallback")
+            return image  # Return as-is if conversion fails
+    else:
+        # Fallback: return PIL image array (RGB instead of BGR)
+        return image
 
 def main():
     # --- Custom CSS for Premium UI ---
